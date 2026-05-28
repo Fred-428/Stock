@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>每日證券損益</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+
+    <style>
+        :root {
+            --ios-bg: #f2f2f7;
+            --card-bg: #ffffff;
+            --stock-red: #d9383a;  /* 台股大漲紅 */
+            --stock-green: #28a745;/* 台股下跌綠 */
+            --text-dark: #1c1c1e;
+            --text-gray: #8e8e93;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--ios-bg);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 40px 20px 20px 20px;
+        }
+        .header { margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
+        .total-profit { font-size: 32px; font-weight: 800; margin: 10px 0 0 0; }
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e5ea;
+        }
+        .stock-item:last-child { border-bottom: none; }
+        .stock-name { font-weight: 600; font-size: 16px; }
+        .stock-sub { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
+        .stock-right { text-align: right; }
+        .up { color: var(--stock-red); }
+        .down { color: var(--stock-green); }
+        .loading { text-align: center; color: var(--text-gray); padding: 40px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>庫存即時損益</h1>
+    </div>
+
+    <div class="card">
+        <div style="color: var(--text-gray); font-size: 14px; font-weight: 500;">累計總投資損益 (TWD)</div>
+        <div id="total-box" class="total-profit">—</div>
+    </div>
+
+    <div class="card" style="padding: 10px 20px;">
+        <div id="list-container">
+            <div class="loading">資料載入中...</div>
+        </div>
+    </div>
+
+    <script>
+        // 你的 Google 試算表 CSV 網址（已補上雙引號）
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv";
+
+        // 專門處理含有雙引號與千分位逗號的 CSV 解析函數
+        function parseCSV(text) {
+            let p = '', r = [];
+            let q = false;
+            let row = [''];
+            for (let i=0; i<text.length; i++) {
+                let c = text[i];
+                if (c === '"') { q = !q; }
+                else if (c === ',' && !q) { r.push(row); row = ['']; }
+                else if (c === '\n' && !q) { 
+                    r.push(row); row = ['']; 
+                } else if (c === '\r' && !q) {
+                    // 忽略換行符號 \r
+                } else {
+                    row[row.length-1] += c;
+                }
+            }
+            if (row.length > 0 && row[0] !== '') r.push(row);
+            return r;
+        }
+
+        async function fetchStockData() {
+            try {
+                const response = await fetch(csvUrl);
+                if (!response.ok) throw new Error('網路連線失敗');
+                
+                const rawData = await response.text();
+                
+                // 使用強大的複雜 CSV 解析器
+                const allRows = parseCSV(rawData);
+                
+                // 過濾並清理資料：確保這一行有資料，且股票代號不為空
+                const rows = allRows.filter(r => r.length >= 6 && r[0].trim() !== "");
+
+                let totalProfit = 0;
+                let htmlContent = '';
+
+                // i = 1 開始（跳過第一行標題）
+                for(let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    
+                    const code = row[0].trim();
+                    const name = row[1].trim();
+                    const shares = parseInt(row[2].replace(/,/g, ''));
+                    const cost = parseFloat(row[3].replace(/,/g, ''));
+                    const currentPrice = parseFloat(row[4].replace(/,/g, ''));
+                    
+                    // 移除可能存在的千分位逗號，轉換成純數字算損益
+                    const profit = Math.round(parseFloat(row[5].replace(/,/g, '')));
+
+                    // 如果這一行是像最底下的「總計行」（沒有代號或名稱），就跳過它
+                    if (code === "股票代號" || name === "" || isNaN(profit)) continue;
+
+                    totalProfit += profit;
+
+                    const profitClass = profit >= 0 ? 'up' : 'down';
+                    const profitSign = profit >= 0 ? '+' : '';
+
+                    htmlContent += `
+                        <div class="stock-item">
+                            <div>
+                                <div class="stock-name">${name} <span style="font-size:13px; color:var(--text-gray); font-weight:400;">(${code})</span></div>
+                                <div class="stock-sub">${shares.toLocaleString()} 股 | 均價 ${cost}</div>
+                            </div>
+                            <div class="stock-right">
+                                <div class="stock-name">${currentPrice}</div>
+                                <div class="stock-sub ${profitClass}" style="font-weight:600;">${profitSign}${profit.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // 顯示總投資損益
+                const totalBox = document.getElementById('total-box');
+                totalBox.innerText = (totalProfit >= 0 ? '+' : '') + totalProfit.toLocaleString();
+                totalBox.className = 'total-profit ' + (totalProfit >= 0 ? 'up' : 'down');
+                
+                document.getElementById('list-container').innerHTML = htmlContent;
+
+            } catch (error) {
+                document.getElementById('list-container').innerHTML = `<div class="loading">資料解析失敗，請重新整理。<br><span style="font-size:10px;color:red;">${error.message}</span></div>`;
+            }
+        }
+
+        // 執行
+        fetchStockData();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
