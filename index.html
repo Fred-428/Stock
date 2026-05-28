@@ -70,29 +70,8 @@
     </div>
 
     <script>
-        // 你的 Google 試算表 CSV 網址（已補上雙引號）
+        // 你的 Google 試算表 CSV 網址
         const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv";
-
-        // 專門處理含有雙引號與千分位逗號的 CSV 解析函數
-        function parseCSV(text) {
-            let p = '', r = [];
-            let q = false;
-            let row = [''];
-            for (let i=0; i<text.length; i++) {
-                let c = text[i];
-                if (c === '"') { q = !q; }
-                else if (c === ',' && !q) { r.push(row); row = ['']; }
-                else if (c === '\n' && !q) { 
-                    r.push(row); row = ['']; 
-                } else if (c === '\r' && !q) {
-                    // 忽略換行符號 \r
-                } else {
-                    row[row.length-1] += c;
-                }
-            }
-            if (row.length > 0 && row[0] !== '') r.push(row);
-            return r;
-        }
 
         async function fetchStockData() {
             try {
@@ -101,30 +80,27 @@
                 
                 const rawData = await response.text();
                 
-                // 使用強大的複雜 CSV 解析器
-                const allRows = parseCSV(rawData);
-                
-                // 過濾並清理資料：確保這一行有資料，且股票代號不為空
-                const rows = allRows.filter(r => r.length >= 6 && r[0].trim() !== "");
+                // 乾淨資料直接依換行、逗號切分，並過濾掉空行
+                const rows = rawData.split(/\r?\n/).map(row => row.split(',')).filter(row => row.length >= 6);
 
                 let totalProfit = 0;
                 let htmlContent = '';
 
-                // i = 1 開始（跳過第一行標題）
+                // 从 i = 1 開始（跳過第一行標題）
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     
                     const code = row[0].trim();
                     const name = row[1].trim();
-                    const shares = parseInt(row[2].replace(/,/g, ''));
-                    const cost = parseFloat(row[3].replace(/,/g, ''));
-                    const currentPrice = parseFloat(row[4].replace(/,/g, ''));
-                    
-                    // 移除可能存在的千分位逗號，轉換成純數字算損益
-                    const profit = Math.round(parseFloat(row[5].replace(/,/g, '')));
+                    const shares = parseInt(row[2]);
+                    const cost = parseFloat(row[3]);
+                    const currentPrice = parseFloat(row[4]);
+                    const profit = Math.round(parseFloat(row[5]));
 
-                    // 如果這一行是像最底下的「總計行」（沒有代號或名稱），就跳過它
-                    if (code === "股票代號" || name === "" || isNaN(profit)) continue;
+                    // 【防禦機制】如果發現這行不是股票（比如最後一行的總計列，或資料解析不完整），就跳過不處理
+                    if (code === "" || name === "" || isNaN(profit) || code.includes("總計") || code === "股票代號") {
+                        continue;
+                    }
 
                     totalProfit += profit;
 
@@ -145,7 +121,7 @@
                     `;
                 }
 
-                // 顯示總投資損益
+                // 渲染總投資損益（維持前端顯示有千分位逗號，方便閱讀）
                 const totalBox = document.getElementById('total-box');
                 totalBox.innerText = (totalProfit >= 0 ? '+' : '') + totalProfit.toLocaleString();
                 totalBox.className = 'total-profit ' + (totalProfit >= 0 ? 'up' : 'down');
@@ -157,7 +133,7 @@
             }
         }
 
-        // 執行
+        // 啟動
         fetchStockData();
 
         if ('serviceWorker' in navigator) {
