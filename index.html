@@ -24,7 +24,8 @@
             background-color: var(--ios-bg);
             color: var(--text-dark);
             margin: 0;
-            padding: 40px 20px 20px 20px;
+            /* 修正問題 1：增加頂部 Padding，從 40px 改為 65px，徹底避開動態島 */
+            padding: 65px 20px 20px 20px;
         }
         .header { margin-bottom: 20px; }
         .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
@@ -101,9 +102,10 @@
 
         let globalStockData = []; 
 
+        // 改良版強效清理純數字：精準保留負號、小數點並過濾文字
         function parseCleanFloat(val) {
             if (!val) return 0;
-            let s = val.replace(/%/g, '').replace(/[^\d.-]/g, '').trim();
+            let s = val.toString().replace(/%/g, '').replace(/[^\d.-]/g, '').trim();
             let n = parseFloat(s);
             return isNaN(n) ? 0 : n;
         }
@@ -120,11 +122,11 @@
 
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
-                    let code = row[0].trim();
+                    let rawCode = row[0].trim();
                     const name = row[1].trim();
                     const shares = parseInt(row[2]);
 
-                    if (code === "" || name === "" || isNaN(shares) || code.includes("總計") || code === "股票代號") {
+                    if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") {
                         continue;
                     }
 
@@ -134,20 +136,26 @@
                     const totalChangePrice = parseCleanFloat(row[5]); 
                     const changePercent = parseCleanFloat(row[6]);
 
-                    if (code.includes(":")) { 
-                        code = code.split(":")[1]; 
+                    // 修正問題 2：更嚴謹地判定是否為上櫃手動股
+                    // 只有當股票代碼包含 TWO (例如 TWO:6488)，且試算表讀出來的昨收價真的為 0 時，才判定為需要網頁輸入
+                    const isManualStock = rawCode.toUpperCase().includes("TWO") && (yestPrice === 0);
+
+                    // 清理純代碼顯示 (例如 TPE:0050 -> 0050)
+                    let cleanCode = rawCode;
+                    if (cleanCode.includes(":")) { 
+                        cleanCode = cleanCode.split(":")[1]; 
                     }
 
                     globalStockData.push({
                         index: i,
-                        code: code,
+                        code: cleanCode,
                         name: name,
                         shares: shares,
                         yestPrice: yestPrice,
                         currentPrice: currentPrice,
                         totalChangePrice: totalChangePrice,
                         changePercent: changePercent,
-                        isManual: (yestPrice === 0) 
+                        isManual: isManualStock 
                     });
                 }
 
@@ -160,7 +168,7 @@
 
         function calculateAndRender() {
             let totalTodayProfit = 0;
-            let totalYesterdayValue = 0; // 用來累計昨日的總市值基礎
+            let totalYesterdayValue = 0; 
             let htmlContent = '';
 
             globalStockData.forEach((stock) => {
@@ -186,10 +194,8 @@
                     displayTotalChange = Math.round(displayTotalChange);
                 }
 
-                // 累計總損益
                 totalTodayProfit += displayTotalChange;
                 
-                // 計算昨日總市值 = 昨日單股收盤價 * 持股股數
                 if (activeYestPrice > 0) {
                     totalYesterdayValue += (activeYestPrice * stock.shares);
                 }
