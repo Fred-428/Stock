@@ -24,7 +24,8 @@
             background-color: var(--ios-bg);
             color: var(--text-dark);
             margin: 0;
-            padding: 65px 20px 20px 20px; /* 避開動態島 */
+            /* 修正問題 1：增加頂部 Padding，從 40px 改為 65px，徹底避開動態島 */
+            padding: 65px 20px 20px 20px;
         }
         .header { margin-bottom: 20px; }
         .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
@@ -35,18 +36,8 @@
             margin-bottom: 16px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
-        
-        /* 修正：建立一個水平並排的容器 */
-        .total-row {
-            display: flex;
-            align-items: baseline; /* 讓字體底部對齊 */
-            gap: 12px;             /* 金額與百分比的中間留白 */
-            margin: 10px 0 0 0;
-        }
-        
-        /* 修正：金額與百分比字體放大到一樣等級 (32px) */
-        .total-profit { font-size: 32px; font-weight: 800; }
-        .total-percent { font-size: 32px; font-weight: 800; }
+        .total-profit { font-size: 32px; font-weight: 800; margin: 10px 0 0 0; }
+        .total-percent { font-size: 16px; font-weight: 700; margin-top: 6px; }
         
         .stock-item {
             padding: 14px 0;
@@ -96,10 +87,8 @@
 
     <div class="card">
         <div style="color: var(--text-gray); font-size: 14px; font-weight: 500;">今日預估總損益 (TWD)</div>
-        <div class="total-row">
-            <span id="total-box" class="total-profit">—</span>
-            <span id="total-percent-box" class="total-percent">—</span>
-        </div>
+        <div id="total-box" class="total-profit">—</div>
+        <div id="total-percent-box" class="total-percent">—</div>
     </div>
 
     <div class="card" style="padding: 10px 20px;">
@@ -113,6 +102,7 @@
 
         let globalStockData = []; 
 
+        // 改良版強效清理純數字：精準保留負號、小數點並過濾文字
         function parseCleanFloat(val) {
             if (!val) return 0;
             let s = val.toString().replace(/%/g, '').replace(/[^\d.-]/g, '').trim();
@@ -140,13 +130,17 @@
                         continue;
                     }
 
+                    // 欄位：D=昨日收盤, E=市價, F=今日漲跌總額, G=今日漲跌%
                     const yestPrice = parseCleanFloat(row[3]);
                     const currentPrice = parseCleanFloat(row[4]);
                     const totalChangePrice = parseCleanFloat(row[5]); 
                     const changePercent = parseCleanFloat(row[6]);
 
+                    // 修正問題 2：更嚴謹地判定是否為上櫃手動股
+                    // 只有當股票代碼包含 TWO (例如 TWO:6488)，且試算表讀出來的昨收價真的為 0 時，才判定為需要網頁輸入
                     const isManualStock = rawCode.toUpperCase().includes("TWO") && (yestPrice === 0);
 
+                    // 清理純代碼顯示 (例如 TPE:0050 -> 0050)
                     let cleanCode = rawCode;
                     if (cleanCode.includes(":")) { 
                         cleanCode = cleanCode.split(":")[1]; 
@@ -183,6 +177,7 @@
                 let displayCurrentPrice = stock.currentPrice;
                 let activeYestPrice = stock.yestPrice;
 
+                // 如果是需要手動填寫昨收價的上櫃股
                 if (stock.isManual) {
                     const inputEl = document.getElementById(`input-${stock.index}`);
                     const manualYestClose = inputEl ? parseFloat(inputEl.value) : 0;
@@ -238,12 +233,12 @@
                 htmlContent += `</div>`; 
             });
 
-            // 1. 渲染大字金額
+            // 1. 渲染頂部大字金額
             const totalBox = document.getElementById('total-box');
             totalBox.innerText = (totalTodayProfit >= 0 ? '+' : '') + totalTodayProfit.toLocaleString();
             totalBox.className = 'total-profit ' + (totalTodayProfit >= 0 ? 'up' : 'down');
             
-            // 2. 修正：計算並並排渲染「大字總漲跌幅 %」
+            // 2. 智慧計算並渲染「總漲跌幅 %」
             const totalPercentBox = document.getElementById('total-percent-box');
             let totalPercent = 0;
             if (totalYesterdayValue > 0) {
