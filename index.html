@@ -24,7 +24,7 @@
             background-color: var(--ios-bg);
             color: var(--text-dark);
             margin: 0;
-            padding: 65px 20px 20px 20px; /* 避開動態島 */
+            padding: 65px 20px 20px 20px; /* 完美避開動態島 */
         }
         .header { margin-bottom: 20px; }
         .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
@@ -40,7 +40,7 @@
         .total-row {
             display: flex;
             justify-content: space-between; 
-            align-items: baseline;          
+            align-items: baseline;          /* 讓字體底部對齊 */
             margin: 10px 0 0 0;
         }
         
@@ -64,28 +64,6 @@
         .up { color: var(--stock-red); }
         .down { color: var(--stock-green); }
         .loading { text-align: center; color: var(--text-gray); padding: 40px; }
-        
-        /* iOS 風格輕量輸入框 */
-        .input-area {
-            margin-top: 8px;
-            display: flex;
-            align-items: center;
-            background: #f2f2f7;
-            padding: 6px 12px;
-            border-radius: 8px;
-            gap: 8px;
-        }
-        .input-area label { font-size: 12px; color: var(--text-gray); }
-        .ios-input {
-            border: none;
-            background: transparent;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-dark);
-            width: 80px;
-            outline: none;
-            padding: 2px;
-        }
     </style>
 </head>
 <body>
@@ -109,13 +87,10 @@
     </div>
 
     <script>
-        // 智慧生成防快取 URL
-        function getFreshCsvUrl() {
-            return "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv&t=" + new Date().getTime();
-        }
+        // 加上時間戳記強迫每次都抓 Google 試算表最新發布的 CSV
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv&t=" + new Date().getTime();
 
         let globalStockData = []; 
-        let hasForceRetried = false; // 防連鎖死循環鎖
 
         function parseCleanFloat(val) {
             if (!val) return 0;
@@ -126,8 +101,7 @@
 
         async function fetchStockData() {
             try {
-                // 強制網路優先，跳過任何快取機制
-                const response = await fetch(getFreshCsvUrl(), { cache: "no-store", headers: { 'Cache-Control': 'no-cache' } }); 
+                const response = await fetch(csvUrl, { cache: "no-store" }); 
                 if (!response.ok) throw new Error('網路連線失敗');
                 
                 const rawData = await response.text();
@@ -143,16 +117,16 @@
                     const name = row[1] ? row[1].trim() : "";
                     const shares = row[2] ? parseInt(row[2]) : NaN;
 
+                    // 過濾無用行
                     if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") {
                         continue;
                     }
 
+                    // 網頁百分之百信任並讀取你在試算表裡準備好的數字
                     const yestPrice = parseCleanFloat(row[3]);
                     const currentPrice = parseCleanFloat(row[4]);
                     const totalChangePrice = parseCleanFloat(row[5]); 
                     const changePercent = parseCleanFloat(row[6]);
-
-                    const isManualStock = rawCode.toUpperCase().includes("TWO") && (yestPrice === 0);
 
                     let cleanCode = rawCode;
                     if (cleanCode.includes(":")) { 
@@ -160,15 +134,13 @@
                     }
 
                     globalStockData.push({
-                        index: i,
                         code: cleanCode,
                         name: name,
                         shares: shares,
                         yestPrice: yestPrice,
                         currentPrice: currentPrice,
                         totalChangePrice: totalChangePrice,
-                        changePercent: changePercent,
-                        isManual: isManualStock 
+                        changePercent: changePercent
                     });
                 }
 
@@ -185,31 +157,13 @@
             let htmlContent = '';
 
             globalStockData.forEach((stock) => {
-                let displayTotalChange = stock.totalChangePrice;
-                let displayChangePercent = stock.changePercent;
-                let displayCurrentPrice = stock.currentPrice;
-                let activeYestPrice = stock.yestPrice;
-
-                if (stock.isManual) {
-                    const inputEl = document.getElementById(`input-${stock.index}`);
-                    const manualYestClose = inputEl ? parseFloat(inputEl.value) : 0;
-                    activeYestPrice = manualYestClose;
-
-                    if (manualYestClose > 0 && displayCurrentPrice > 0) {
-                        displayTotalChange = Math.round((displayCurrentPrice - manualYestClose) * stock.shares);
-                        displayChangePercent = ((displayCurrentPrice - manualYestClose) / manualYestClose) * 100;
-                    } else {
-                        displayTotalChange = 0;
-                        displayChangePercent = 0;
-                    }
-                } else {
-                    displayTotalChange = Math.round(displayTotalChange);
-                }
+                const displayTotalChange = Math.round(stock.totalChangePrice);
+                const displayChangePercent = stock.changePercent;
+                const displayCurrentPrice = stock.currentPrice;
 
                 totalTodayProfit += displayTotalChange;
-                
-                if (activeYestPrice > 0) {
-                    totalYesterdayValue += (activeYestPrice * stock.shares);
+                if (stock.yestPrice > 0) {
+                    totalYesterdayValue += (stock.yestPrice * stock.shares);
                 }
 
                 const profitClass = displayTotalChange >= 0 ? 'up' : 'down';
@@ -230,32 +184,16 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
                 `;
-
-                if (stock.isManual) {
-                    const currentInputValue = document.getElementById(`input-${stock.index}`) ? document.getElementById(`input-${stock.index}`).value : '';
-                    htmlContent += `
-                        <div class="input-area">
-                            <label>⚠️ 請輸入昨收價：</label>
-                            <input type="number" step="0.1" id="input-${stock.index}" class="ios-input" placeholder="0.0" value="${currentInputValue}" oninput="updateManualStock()">
-                        </div>
-                    `;
-                }
-
-                htmlContent += `</div>`; 
             });
 
-            // 防禦性修正：如果算出來剛好是 0，且這是第一次載入，代表高度疑似吃到了空快取
-            // 觸發在背景立刻強刷，修正「有時打開是 0」的問題，使用者完全無感
-            if (totalTodayProfit === 0 && !hasForceRetried && globalStockData.length > 0) {
-                hasForceRetried = true;
-                setTimeout(() => { fetchStockData(); }, 300);
-            }
-
+            // 1. 渲染左側大字總損益金額
             const totalBox = document.getElementById('total-box');
             totalBox.innerText = (totalTodayProfit >= 0 ? '+' : '') + totalTodayProfit.toLocaleString();
             totalBox.className = 'total-profit ' + (totalTodayProfit >= 0 ? 'up' : 'down');
             
+            // 2. 智慧計算並渲染右側大字總漲跌幅 %
             const totalPercentBox = document.getElementById('total-percent-box');
             let totalPercent = 0;
             if (totalYesterdayValue > 0) {
@@ -267,32 +205,9 @@
             totalPercentBox.innerText = `${totalSign}${totalPercent.toFixed(2)}%`;
             totalPercentBox.className = `total-percent ${totalClass}`;
 
-            const container = document.getElementById('list-container');
-            const activeId = document.activeElement ? document.activeElement.id : null;
-            const activeValue = document.activeElement ? document.activeElement.value : null;
-            
-            container.innerHTML = htmlContent;
-            
-            if (activeId) {
-                const el = document.getElementById(activeId);
-                if (el) {
-                    el.focus();
-                    el.value = activeValue;
-                }
-            }
+            // 渲染清單
+            document.getElementById('list-container').innerHTML = htmlContent;
         }
-
-        function updateManualStock() {
-            calculateAndRender();
-        }
-
-        // 智慧防禦 2：當使用者切換 App 重新回到這個畫面時，自動觸發重抓最新資料
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                hasForceRetried = false; // 重置防線
-                fetchStockData();
-            }
-        });
 
         fetchStockData();
 
