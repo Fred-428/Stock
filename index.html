@@ -36,11 +36,11 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
         
-        /* 修正：讓總金額與總趴數兩端對齊（金額靠左、趴數靠右） */
+        /* 總金額與總趴數兩端對齊（金額靠左、趴數靠右） */
         .total-row {
             display: flex;
             justify-content: space-between; 
-            align-items: baseline;          /* 讓字體底部對齊 */
+            align-items: baseline;          
             margin: 10px 0 0 0;
         }
         
@@ -109,9 +109,13 @@
     </div>
 
     <script>
-        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv&t=" + new Date().getTime();
+        // 智慧生成防快取 URL
+        function getFreshCsvUrl() {
+            return "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv&t=" + new Date().getTime();
+        }
 
         let globalStockData = []; 
+        let hasForceRetried = false; // 防連鎖死循環鎖
 
         function parseCleanFloat(val) {
             if (!val) return 0;
@@ -122,7 +126,8 @@
 
         async function fetchStockData() {
             try {
-                const response = await fetch(csvUrl, { cache: "no-store" }); 
+                // 強制網路優先，跳過任何快取機制
+                const response = await fetch(getFreshCsvUrl(), { cache: "no-store", headers: { 'Cache-Control': 'no-cache' } }); 
                 if (!response.ok) throw new Error('網路連線失敗');
                 
                 const rawData = await response.text();
@@ -132,7 +137,6 @@
 
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
-                    
                     if (!row || row.length < 7) continue;
 
                     let rawCode = row[0] ? row[0].trim() : "";
@@ -241,9 +245,60 @@
                 htmlContent += `</div>`; 
             });
 
-            // 1. 渲染大字金額
+            // 防禦性修正：如果算出來剛好是 0，且這是第一次載入，代表高度疑似吃到了空快取
+            // 觸發在背景立刻強刷，修正「有時打開是 0」的問題，使用者完全無感
+            if (totalTodayProfit === 0 && !hasForceRetried && globalStockData.length > 0) {
+                hasForceRetried = true;
+                setTimeout(() => { fetchStockData(); }, 300);
+            }
+
             const totalBox = document.getElementById('total-box');
             totalBox.innerText = (totalTodayProfit >= 0 ? '+' : '') + totalTodayProfit.toLocaleString();
             totalBox.className = 'total-profit ' + (totalTodayProfit >= 0 ? 'up' : 'down');
             
-            // 2. 渲染大字總漲跌幅 %（靠右對齊）
+            const totalPercentBox = document.getElementById('total-percent-box');
+            let totalPercent = 0;
+            if (totalYesterdayValue > 0) {
+                totalPercent = (totalTodayProfit / totalYesterdayValue) * 100;
+            }
+            
+            const totalClass = totalTodayProfit >= 0 ? 'up' : 'down';
+            const totalSign = totalTodayProfit >= 0 ? '+' : '';
+            totalPercentBox.innerText = `${totalSign}${totalPercent.toFixed(2)}%`;
+            totalPercentBox.className = `total-percent ${totalClass}`;
+
+            const container = document.getElementById('list-container');
+            const activeId = document.activeElement ? document.activeElement.id : null;
+            const activeValue = document.activeElement ? document.activeElement.value : null;
+            
+            container.innerHTML = htmlContent;
+            
+            if (activeId) {
+                const el = document.getElementById(activeId);
+                if (el) {
+                    el.focus();
+                    el.value = activeValue;
+                }
+            }
+        }
+
+        function updateManualStock() {
+            calculateAndRender();
+        }
+
+        // 智慧防禦 2：當使用者切換 App 重新回到這個畫面時，自動觸發重抓最新資料
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                hasForceRetried = false; // 重置防線
+                fetchStockData();
+            }
+        });
+
+        fetchStockData();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
