@@ -36,15 +36,15 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
         
-        /* 水平並排容器 */
+        /* 修正：建立一個水平並排的容器 */
         .total-row {
             display: flex;
-            align-items: baseline; 
-            gap: 12px;             
+            align-items: baseline; /* 讓字體底部對齊 */
+            gap: 12px;             /* 金額與百分比的中間留白 */
             margin: 10px 0 0 0;
         }
         
-        /* 金額與百分比字體放大到一樣等級 (32px) */
+        /* 修正：金額與百分比字體放大到一樣等級 (32px) */
         .total-profit { font-size: 32px; font-weight: 800; }
         .total-percent { font-size: 32px; font-weight: 800; }
         
@@ -109,8 +109,7 @@
     </div>
 
     <script>
-        // 加上時間戳記避免強硬快取
-        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv&t=" + new Date().getTime();
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?output=csv";
 
         let globalStockData = []; 
 
@@ -123,28 +122,21 @@
 
         async function fetchStockData() {
             try {
-                const response = await fetch(csvUrl, { cache: "no-store" }); 
+                const response = await fetch(csvUrl);
                 if (!response.ok) throw new Error('網路連線失敗');
                 
                 const rawData = await response.text();
-                
-                // 修正：更安全的 CSV 行拆解方式，避免因為空白行導致陣列報錯
-                const rows = rawData.split(/\r?\n/).map(row => row.split(','));
+                const rows = rawData.split(/\r?\n/).map(row => row.split(',')).filter(row => row.length >= 7);
 
                 globalStockData = [];
 
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
-                    
-                    // 防禦：如果這行欄位不足 7 個，直接跳過，不讓程式崩潰
-                    if (!row || row.length < 7) continue;
+                    let rawCode = row[0].trim();
+                    const name = row[1].trim();
+                    const shares = parseInt(row[2]);
 
-                    let rawCode = row[0] ? row[0].trim() : "";
-                    const name = row[1] ? row[1].trim() : "";
-                    const shares = row[2] ? parseInt(row[2]) : NaN;
-
-                    // 檢查基本必填欄位
-                    if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號" || rawCode === "A") {
+                    if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") {
                         continue;
                     }
 
@@ -192,10 +184,8 @@
                 let activeYestPrice = stock.yestPrice;
 
                 if (stock.isManual) {
-                    const savedValue = localStorage.getItem(`saved-yest-${stock.code}`) || '';
                     const inputEl = document.getElementById(`input-${stock.index}`);
-                    
-                    const manualYestClose = inputEl ? parseFloat(inputEl.value) : (savedValue !== '' ? parseFloat(savedValue) : 0);
+                    const manualYestClose = inputEl ? parseFloat(inputEl.value) : 0;
                     activeYestPrice = manualYestClose;
 
                     if (manualYestClose > 0 && displayCurrentPrice > 0) {
@@ -236,14 +226,11 @@
                 `;
 
                 if (stock.isManual) {
-                    const savedValue = localStorage.getItem(`saved-yest-${stock.code}`) || '';
-                    const inputEl = document.getElementById(`input-${stock.index}`);
-                    const currentInputValue = inputEl ? inputEl.value : savedValue;
-                    
+                    const currentInputValue = document.getElementById(`input-${stock.index}`) ? document.getElementById(`input-${stock.index}`).value : '';
                     htmlContent += `
                         <div class="input-area">
                             <label>⚠️ 請輸入昨收價：</label>
-                            <input type="number" step="0.1" id="input-${stock.index}" class="ios-input" placeholder="0.0" value="${currentInputValue}" oninput="updateManualStock('${stock.code}', ${stock.index})">
+                            <input type="number" step="0.1" id="input-${stock.index}" class="ios-input" placeholder="0.0" value="${currentInputValue}" oninput="updateManualStock()">
                         </div>
                     `;
                 }
@@ -256,7 +243,7 @@
             totalBox.innerText = (totalTodayProfit >= 0 ? '+' : '') + totalTodayProfit.toLocaleString();
             totalBox.className = 'total-profit ' + (totalTodayProfit >= 0 ? 'up' : 'down');
             
-            // 2. 渲染大字總漲跌幅 %
+            // 2. 修正：計算並並排渲染「大字總漲跌幅 %」
             const totalPercentBox = document.getElementById('total-percent-box');
             let totalPercent = 0;
             if (totalYesterdayValue > 0) {
@@ -268,6 +255,7 @@
             totalPercentBox.innerText = `${totalSign}${totalPercent.toFixed(2)}%`;
             totalPercentBox.className = `total-percent ${totalClass}`;
 
+            // 渲染清單
             const container = document.getElementById('list-container');
             const activeId = document.activeElement ? document.activeElement.id : null;
             const activeValue = document.activeElement ? document.activeElement.value : null;
@@ -283,11 +271,7 @@
             }
         }
 
-        function updateManualStock(stockCode, index) {
-            const inputEl = document.getElementById(`input-${index}`);
-            if (inputEl) {
-                localStorage.setItem(`saved-yest-${stockCode}`, inputEl.value);
-            }
+        function updateManualStock() {
             calculateAndRender();
         }
 
