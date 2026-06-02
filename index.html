@@ -71,6 +71,15 @@
         .total-profit { font-size: 32px; font-weight: 800; }
         .total-percent { font-size: 32px; font-weight: 800; text-align: right; }
         
+        /* 美股專用次要台幣資訊欄 */
+        .total-sub-row {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-gray);
+            margin-top: 4px;
+            text-align: left;
+        }
+        
         .stock-item {
             padding: 14px 0;
             border-bottom: 1px solid #e5e5ea;
@@ -119,11 +128,12 @@
 
     <div id="panel-us" class="tab-panel">
         <div class="card">
-            <div style="color: var(--text-gray); font-size: 14px; font-weight: 500;">今日預估總損益 (TWD)</div>
+            <div style="color: var(--text-gray); font-size: 14px; font-weight: 500;">今日預估總損益</div>
             <div class="total-row">
                 <span id="us-total-box" class="total-profit">—</span>
                 <span id="us-percent-box" class="total-percent">—</span>
             </div>
+            <div id="us-twd-box" class="total-sub-row">—</div>
         </div>
         <div class="card" style="padding: 10px 20px;">
             <div id="us-list-container"><div class="loading">資料載入中...</div></div>
@@ -163,7 +173,7 @@
             }
         }
 
-        // 解析台股 CSV (A代號, B名稱, C股數, D昨收, E現價, F今日漲跌, G漲跌%)
+        // 解析台股 CSV (A代號, B名稱, C股數, D昨收, E現價, F今日單股漲跌, G漲跌%)
         async function fetchTaiwanData() {
             try {
                 const response = await fetch(taiwanCsvUrl, { cache: "no-store" });
@@ -183,7 +193,6 @@
 
                     let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
                     
-                    // 台股試算表的 F 欄如果是單股漲跌，總損益需要乘以股數
                     let singleChange = parseCleanFloat(row[5]);
                     let totalChange = singleChange * shares; 
 
@@ -280,7 +289,7 @@
             document.getElementById('tw-list-container').innerHTML = html;
         }
 
-        // 渲染美股（綠漲紅跌 + 自動乘以匯率換算台幣）
+        // 渲染美股（綠漲紅跌 + 雙幣別看板）
         function renderUs() {
             let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
 
@@ -306,16 +315,23 @@
                     </div>`;
             });
 
-            // 美股總損益換算台幣
-            const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
+            // 1. 主要大字看板：美金總損益 (USD)
             const box = document.getElementById('us-total-box');
-            box.innerText = (totalTwdProfit >= 0 ? '+' : '') + totalTwdProfit.toLocaleString();
+            box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
             box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
 
+            // 2. 主要大字看板：美股總趴數
             let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
             const pBox = document.getElementById('us-percent-box');
             pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
             pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
+
+            // 3. 次要小字看板：換算後的台幣損益 (TWD)
+            const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
+            const twdBox = document.getElementById('us-twd-box');
+            twdBox.innerText = `折合台幣: ${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
+            // 台幣字體顏色也同步跟隨漲跌
+            twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
 
             document.getElementById('us-list-container').innerHTML = html;
         }
