@@ -7,7 +7,7 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link class="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
 
     <style>
@@ -113,13 +113,13 @@
             margin-top: 4px;
         }
         
-        /* 💡 台股維持原本滿意的對齊寬度 (72px) */
+        /* 台股維持原本滿意的對齊寬度 (72px) */
         .tw-shares {
             width: 72px;       
             flex-shrink: 0;
         }
         
-        /* 💡 美股再往左靠兩個中文字 (縮減到 18px)，讓昨收緊貼持股數 */
+        /* 美股往左靠兩個中文字 (縮減到 18px)，讓昨收緊貼持股數 */
         .us-shares {
             width: 18px;       
             flex-shrink: 0;
@@ -246,6 +246,7 @@
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
                 usStockData = [];
 
+                // 抓取即時匯率 (對應 G2 儲存格)
                 if (rows[1] && rows[1][6]) {
                     let rate = parseCleanFloat(rows[1][6]);
                     if (rate > 0) usdToTwdRate = rate;
@@ -254,20 +255,23 @@
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     if (!row || row.length < 6) continue;
+                    
                     let code = row[0] ? row[0].trim() : "";
-                    const shares = parseCleanFloat(row[1]);
+                    const shares = parseCleanFloat(row[1]);      // B欄：持股股數
+                    const yestPrice = parseCleanFloat(row[2]);   // C欄：昨日收盤價
+                    const currentPrice = parseCleanFloat(row[3]);// D欄：單股市價 (今日現價)
+                    const todayChangeUsd = parseCleanFloat(row[4]);// E欄：今日漲跌
+                    const changePercent = parseCleanFloat(row[5]); // F欄：今日漲跌%
 
                     if (code === "" || isNaN(shares) || shares === 0 || code.includes("股票代號") || code.includes("總計")) continue;
-
-                    let totalChangeUsd = parseCleanFloat(row[4]); 
 
                     usStockData.push({
                         code: code, 
                         shares: shares,
-                        yestPrice: parseCleanFloat(row[2]),
-                        currentPrice: parseCleanFloat(row[3]),
-                        todayChangeUsd: totalChangeUsd, 
-                        changePercent: parseCleanFloat(row[5])
+                        yestPrice: yestPrice,
+                        currentPrice: currentPrice,
+                        todayChangeUsd: todayChangeUsd, 
+                        changePercent: changePercent
                     });
                 }
                 renderUs();
