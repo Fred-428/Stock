@@ -310,4 +310,63 @@
 
             let pct = totalYestValue > 0 ? (totalProfit / totalYestValue) * 100 : 0;
             const pBox = document.getElementById('tw-percent-box');
-            pBox.innerText = `${totalProfit >=
+            pBox.innerText = `${totalProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            pBox.className = `total-percent ${totalProfit >= 0 ? 'tw-up' : 'tw-down'}`;
+
+            document.getElementById('tw-list-container').innerHTML = html;
+        }
+
+        function renderUs() {
+            let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
+
+            usStockData.forEach(stock => {
+                totalUsdProfit += stock.todayChangeUsd;
+                if (stock.yestPrice > 0) totalYestUsd += (stock.yestPrice * stock.shares);
+
+                const cClass = stock.todayChangeUsd >= 0 ? 'us-up' : 'us-down';
+                const sign = stock.todayChangeUsd >= 0 ? '+' : '';
+
+                html += `
+                    <div class="stock-item">
+                        <div class="stock-row">
+                            <div>
+                                <div class="stock-name">${stock.code}</div>
+                                <div class="stock-sub-container">
+                                    <span class="us-shares">${stock.shares} 股</span>
+                                    <span class="sub-yest">昨收 $${stock.yestPrice.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div class="stock-right">
+                                <div class="stock-name">$${stock.currentPrice.toFixed(2)}</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}$${stock.todayChangeUsd.toFixed(2)} (${sign}${stock.changePercent.toFixed(2)}%)</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            const box = document.getElementById('us-total-box');
+            box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
+            box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
+
+            let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
+            const pBox = document.getElementById('us-percent-box');
+            pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
+
+            const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
+            const twdBox = document.getElementById('us-twd-box');
+            twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
+            twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
+
+            document.getElementById('us-list-container').innerHTML = html;
+        }
+
+        fetchTaiwanData();
+        fetchUsData();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
