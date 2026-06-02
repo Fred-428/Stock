@@ -24,7 +24,7 @@
             background-color: var(--ios-bg);
             color: var(--text-dark);
             margin: 0;
-            padding: 65px 20px 20px 20px; /* 避開 iOS 動態島 */
+            padding: 65px 20px 20px 20px;
         }
         
         /* iOS 原生風格分頁切換鈕 */
@@ -60,7 +60,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
         
-        /* 修正：頂部總金額與趴數分欄，確保不論數字多長都絕對不重疊、不擠壓 */
+        /* 頂部總金額與趴數分欄 */
         .total-row {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -105,7 +105,7 @@
         }
         .stock-name { font-weight: 600; font-size: 16px; }
         
-        /* 核心修正：利用彈性盒與固定寬度，讓「持股數」與「昨收價」橫向各自完美對齊 */
+        /* 利用彈性盒與固定寬度，讓「持股數」與「昨收價」橫向各自完美對齊 */
         .stock-sub-container {
             display: flex;
             font-size: 12px; 
@@ -113,7 +113,7 @@
             margin-top: 4px;
         }
         .sub-shares {
-            width: 85px;       /* 限制股數欄位寬度，讓後方的昨收價可以上下對齊 */
+            width: 72px;       
             flex-shrink: 0;
         }
         .sub-yest {
@@ -122,7 +122,6 @@
 
         .stock-right { text-align: right; }
         
-        /* 漲跌顏色控制（台股紅漲綠跌、美股綠漲紅跌） */
         .tw-up { color: var(--stock-red); }     
         .tw-down { color: var(--stock-green); } 
         .us-up { color: var(--stock-green); }   
@@ -169,16 +168,13 @@
     </div>
 
     <script>
-        // =================================================================
-        // 🛠️ 請在此處精確貼上你獲取的兩個 CSV 網址：
-        // =================================================================
+        // 已直接寫入您的台美股網址，並加上時間戳防止快取
         const taiwanCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
         const usCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv" + "&t=" + new Date().getTime();
-        // =================================================================
 
         let twStockData = [];
         let usStockData = [];
-        let usdToTwdRate = 31.47; // 預設匯率
+        let usdToTwdRate = 31.47;
 
         function parseCleanFloat(val) {
             if (!val) return 0;
@@ -187,7 +183,6 @@
             return isNaN(n) ? 0 : n;
         }
 
-        // 分頁切換
         function switchTab(market) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
@@ -201,7 +196,6 @@
             }
         }
 
-        // 解析台股 CSV (A代號, B名稱, C股數, D昨收, E現價, F今日總損益, G漲跌%)
         async function fetchTaiwanData() {
             try {
                 const response = await fetch(taiwanCsvUrl, { cache: "no-store" });
@@ -220,8 +214,6 @@
                     if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") continue;
 
                     let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
-                    
-                    // 修正：依據試算表截圖，F欄已是該檔的「今日總損益」，不再乘持股數
                     let totalChange = parseCleanFloat(row[5]); 
 
                     twStockData.push({
@@ -238,7 +230,6 @@
             }
         }
 
-        // 解析美股 CSV (A代號, B股數, C昨收, D現價, E今日總損益, F漲跌%, G匯率)
         async function fetchUsData() {
             try {
                 const response = await fetch(usCsvUrl, { cache: "no-store" });
@@ -247,7 +238,6 @@
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
                 usStockData = [];
 
-                // 讀取 G2 的即時匯率
                 if (rows[1] && rows[1][6]) {
                     let rate = parseCleanFloat(rows[1][6]);
                     if (rate > 0) usdToTwdRate = rate;
@@ -261,7 +251,6 @@
 
                     if (code === "" || isNaN(shares) || shares === 0 || code.includes("股票代號") || code.includes("總計")) continue;
 
-                    // 修正：依據試算表截圖，E欄已是計算好的「今日美金總損益」，直接讀取即可
                     let totalChangeUsd = parseCleanFloat(row[4]); 
 
                     usStockData.push({
@@ -279,7 +268,6 @@
             }
         }
 
-        // 渲染台股（紅漲綠跌）
         function renderTaiwan() {
             let totalProfit = 0; let totalYestValue = 0; let html = '';
             
@@ -320,7 +308,6 @@
             document.getElementById('tw-list-container').innerHTML = html;
         }
 
-        // 渲染美股（綠漲紅跌 + 雙幣別看板）
         function renderUs() {
             let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
 
@@ -349,27 +336,23 @@
                     </div>`;
             });
 
-            // 1. 主要美金看板
             const box = document.getElementById('us-total-box');
             box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
             box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
 
-            // 2. 總趴數看板
             let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
             const pBox = document.getElementById('us-percent-box');
             pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
             pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
 
-            // 3. 次要折合台幣看板
             const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
             const twdBox = document.getElementById('us-twd-box');
-            twdBox.innerText = `折合台幣: ${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
+            twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
             twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
 
             document.getElementById('us-list-container').innerHTML = html;
         }
 
-        // 自動加載
         fetchTaiwanData();
         fetchUsData();
 
