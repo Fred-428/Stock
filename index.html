@@ -60,7 +60,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
         
-        /* 總金額與總趴數兩端對齊（左金額、右趴數） */
+        /* 總金額與總趴數兩端對齊 */
         .total-row {
             display: flex;
             justify-content: space-between; 
@@ -85,11 +85,11 @@
         .stock-sub { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
         .stock-right { text-align: right; }
         
-        /* 漲跌顏色控制（台美獨立） */
-        .tw-up { color: var(--stock-red); }     /* 台股漲紅 */
-        .tw-down { color: var(--stock-green); } /* 台股跌綠 */
-        .us-up { color: var(--stock-green); }   /* 美股漲綠 */
-        .us-down { color: var(--stock-red); }     /* 美股跌紅 */
+        /* 漲跌顏色控制（台股紅漲綠跌、美股綠漲紅跌） */
+        .tw-up { color: var(--stock-red); }     
+        .tw-down { color: var(--stock-green); } 
+        .us-up { color: var(--stock-green); }   
+        .us-down { color: var(--stock-red); }     
         
         .loading { text-align: center; color: var(--text-gray); padding: 40px; }
         
@@ -132,7 +132,7 @@
 
     <script>
         // =================================================================
-        // 🛠️ 請在此處替換成你剛剛在「第二步」複製的兩個 CSV 網址：
+        // 🛠️ 請在此處精確貼上你剛剛獲取的兩個 CSV 網址：
         // =================================================================
         const taiwanCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
         const usCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv" + "&t=" + new Date().getTime();
@@ -140,7 +140,7 @@
 
         let twStockData = [];
         let usStockData = [];
-        let usdToTwdRate = 31.47; // 預設匯率
+        let usdToTwdRate = 31.45; // 預設匯率
 
         function parseCleanFloat(val) {
             if (!val) return 0;
@@ -149,7 +149,7 @@
             return isNaN(n) ? 0 : n;
         }
 
-        // 分頁一切換功能
+        // 分頁切換
         function switchTab(market) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
@@ -163,10 +163,11 @@
             }
         }
 
-        // 讀取與解析台股 CSV
+        // 解析台股 CSV (A代號, B名稱, C股數, D昨收, E現價, F今日漲跌, G漲跌%)
         async function fetchTaiwanData() {
             try {
                 const response = await fetch(taiwanCsvUrl, { cache: "no-store" });
+                if (!response.ok) throw new Error();
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
                 twStockData = [];
@@ -176,34 +177,40 @@
                     if (!row || row.length < 7) continue;
                     let rawCode = row[0] ? row[0].trim() : "";
                     const name = row[1] ? row[1].trim() : "";
-                    const shares = row[2] ? parseInt(row[2]) : NaN;
+                    const shares = parseInt(row[2]);
 
                     if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") continue;
 
                     let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
+                    
+                    // 台股試算表的 F 欄如果是單股漲跌，總損益需要乘以股數
+                    let singleChange = parseCleanFloat(row[5]);
+                    let totalChange = singleChange * shares; 
+
                     twStockData.push({
                         code: cleanCode, name: name, shares: shares,
                         yestPrice: parseCleanFloat(row[3]),
                         currentPrice: parseCleanFloat(row[4]),
-                        totalChange: parseCleanFloat(row[5]),
+                        totalChange: totalChange,
                         changePercent: parseCleanFloat(row[6])
                     });
                 }
                 renderTaiwan();
             } catch (e) {
-                document.getElementById('tw-list-container').innerHTML = `<div class="loading">台股資料解析失敗，請確認網址。</div>`;
+                document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股網路連線失敗<br><span style="font-size:11px;color:gray;">請檢查台股分頁發布網址</span></div>`;
             }
         }
 
-        // 讀取與解析美股 CSV
+        // 解析美股 CSV (A代號, B股數, C昨收, D現價, E單股漲跌, F漲跌%, G匯率)
         async function fetchUsData() {
             try {
                 const response = await fetch(usCsvUrl, { cache: "no-store" });
+                if (!response.ok) throw new Error();
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
                 usStockData = [];
 
-                // 智慧抓取美股表單 G2 欄位的匯率
+                // 讀取 G2 的匯率
                 if (rows[1] && rows[1][6]) {
                     let rate = parseCleanFloat(rows[1][6]);
                     if (rate > 0) usdToTwdRate = rate;
@@ -213,54 +220,56 @@
                     const row = rows[i];
                     if (!row || row.length < 6) continue;
                     let code = row[0] ? row[0].trim() : "";
-                    const shares = row[1] ? parseInt(row[1]) : NaN;
+                    const shares = parseCleanFloat(row[1]);
 
-                    if (code === "" || isNaN(shares) || code.includes("股票代號")) continue;
+                    if (code === "" || isNaN(shares) || shares === 0 || code.includes("股票代號") || code.includes("總計")) continue;
+
+                    let singleChange = parseCleanFloat(row[4]); // E欄：單股漲跌金額
+                    let totalChangeUsd = singleChange * shares; // 算出該檔美股今日總損益(美金)
 
                     usStockData.push({
-                        code: code, shares: shares,
+                        code: code, 
+                        shares: shares,
                         yestPrice: parseCleanFloat(row[2]),
-                        currentPrice: parseCleanFloat(row[3]),
-                        todayChange: parseCleanFloat(row[4]),
-                        changePercent: parseCleanFloat(row[5])
+                        currentPrice: parseCleanFloat(row[3]), // D欄：單股現價
+                        todayChangeUsd: totalChangeUsd, 
+                        changePercent: parseCleanFloat(row[5])  // F欄：漲跌%
                     });
                 }
                 renderUs();
             } catch (e) {
-                document.getElementById('us-list-container').innerHTML = `<div class="loading">美股資料解析失敗，請確認網址。</div>`;
+                document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股網路連線失敗<br><span style="font-size:11px;color:gray;">請檢查美股分頁發布網址</span></div>`;
             }
         }
 
-        // 渲染台股頁面面（紅漲綠跌）
+        // 渲染台股（紅漲綠跌）
         function renderTaiwan() {
             let totalProfit = 0; let totalYestValue = 0; let html = '';
             
             twStockData.forEach(stock => {
-                const change = Math.round(stock.totalChange);
-                totalProfit += change;
+                totalProfit += stock.totalChange;
                 if (stock.yestPrice > 0) totalYestValue += (stock.yestPrice * stock.shares);
 
-                const cClass = change >= 0 ? 'tw-up' : 'tw-down';
-                const sign = change >= 0 ? '+' : '';
-                const yestStr = stock.yestPrice === 0 ? '—' : stock.yestPrice.toLocaleString();
+                const cClass = stock.totalChange >= 0 ? 'tw-up' : 'tw-down';
+                const sign = stock.totalChange >= 0 ? '+' : '';
 
                 html += `
                     <div class="stock-item">
                         <div class="stock-row">
                             <div>
                                 <div class="stock-name">${stock.name} <span style="font-size:13px; color:var(--text-gray); font-weight:400;">(${stock.code})</span></div>
-                                <div class="stock-sub">${stock.shares.toLocaleString()} 股 &nbsp;·&nbsp; 昨收 ${yestStr}</div>
+                                <div class="stock-sub">${stock.shares.toLocaleString()} 股 &nbsp;·&nbsp; 昨收 ${stock.yestPrice}</div>
                             </div>
                             <div class="stock-right">
-                                <div class="stock-name">${stock.currentPrice === 0 ? '—' : stock.currentPrice}</div>
-                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}${change.toLocaleString()} (${sign}${stock.changePercent.toFixed(2)}%)</div>
+                                <div class="stock-name">${stock.currentPrice}</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}${Math.round(stock.totalChange).toLocaleString()} (${sign}${stock.changePercent.toFixed(2)}%)</div>
                             </div>
                         </div>
                     </div>`;
             });
 
             const box = document.getElementById('tw-total-box');
-            box.innerText = (totalProfit >= 0 ? '+' : '') + totalProfit.toLocaleString();
+            box.innerText = (totalProfit >= 0 ? '+' : '') + Math.round(totalProfit).toLocaleString();
             box.className = 'total-profit ' + (totalProfit >= 0 ? 'tw-up' : 'tw-down');
 
             let pct = totalYestValue > 0 ? (totalProfit / totalYestValue) * 100 : 0;
@@ -271,33 +280,33 @@
             document.getElementById('tw-list-container').innerHTML = html;
         }
 
-        // 渲染美股頁面面（綠漲紅跌 + 總額自動乘以匯率換台幣）
+        // 渲染美股（綠漲紅跌 + 自動乘以匯率換算台幣）
         function renderUs() {
             let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
 
             usStockData.forEach(stock => {
-                totalUsdProfit += stock.todayChange;
+                totalUsdProfit += stock.todayChangeUsd;
                 if (stock.yestPrice > 0) totalYestUsd += (stock.yestPrice * stock.shares);
 
-                const cClass = stock.todayChange >= 0 ? 'us-up' : 'us-down';
-                const sign = stock.todayChange >= 0 ? '+' : '';
+                const cClass = stock.todayChangeUsd >= 0 ? 'us-up' : 'us-down';
+                const sign = stock.todayChangeUsd >= 0 ? '+' : '';
 
                 html += `
                     <div class="stock-item">
                         <div class="stock-row">
                             <div>
                                 <div class="stock-name">${stock.code}</div>
-                                <div class="stock-sub">${stock.shares.toLocaleString()} 股 &nbsp;·&nbsp; 昨收 ${stock.yestPrice.toFixed(2)}</div>
+                                <div class="stock-sub">${stock.shares} 股 &nbsp;·&nbsp; 昨收 $${stock.yestPrice.toFixed(2)}</div>
                             </div>
                             <div class="stock-right">
                                 <div class="stock-name">$${stock.currentPrice.toFixed(2)}</div>
-                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}$${stock.todayChange.toFixed(2)} (${sign}${stock.changePercent.toFixed(2)}%)</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}$${stock.todayChangeUsd.toFixed(2)} (${sign}${stock.changePercent.toFixed(2)}%)</div>
                             </div>
                         </div>
                     </div>`;
             });
 
-            // 美股總損益換算成台幣
+            // 美股總損益換算台幣
             const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
             const box = document.getElementById('us-total-box');
             box.innerText = (totalTwdProfit >= 0 ? '+' : '') + totalTwdProfit.toLocaleString();
@@ -311,7 +320,7 @@
             document.getElementById('us-list-container').innerHTML = html;
         }
 
-        // 進入網頁自動加載
+        // 自動加載
         fetchTaiwanData();
         fetchUsData();
 
