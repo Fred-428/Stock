@@ -7,7 +7,7 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link class="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
 
     <style>
@@ -113,13 +113,11 @@
             margin-top: 4px;
         }
         
-        /* 台股維持原本滿意的對齊寬度 (72px) */
         .tw-shares {
             width: 72px;       
             flex-shrink: 0;
         }
         
-        /* 💡 美股微調放大至 48px：往右挪回一點點，避免擠壓換行，且維持漂亮的向左集中感 */
         .us-shares {
             width: 48px;       
             flex-shrink: 0;
@@ -136,7 +134,7 @@
         .us-up { color: var(--stock-green); }   
         .us-down { color: var(--stock-red); }     
         
-        .loading { text-align: center; color: var(--text-gray); padding: 40px; }
+        .loading { text-align: center; color: var(--text-gray); padding: 40px; font-size: 14px; line-height: 1.6; }
         
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
@@ -177,12 +175,17 @@
     </div>
 
     <script>
-        const taiwanCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
-        const usCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv" + "&t=" + new Date().getTime();
+        const baseUrlTw = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=0&single=true&output=csv";
+        const baseUrlUs = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv";
 
         let twStockData = [];
         let usStockData = [];
         let usdToTwdRate = 31.47;
+
+        // 追蹤重新嘗試次數，防止無限循環重刷
+        let twRetryCount = 0;
+        let usRetryCount = 0;
+        const MAX_RETRIES = 3;
 
         function parseCleanFloat(val) {
             if (!val) return 0;
@@ -204,13 +207,27 @@
             }
         }
 
+        // 核心載入邏輯控制中心
+        function loadAllData() {
+            twRetryCount = 0;
+            usRetryCount = 0;
+            document.getElementById('tw-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
+            document.getElementById('us-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
+            fetchTaiwanData();
+            fetchUsData();
+        }
+
         async function fetchTaiwanData() {
             try {
+                // 強制加上毫秒級時間戳，徹底擊穿 Google 快取
+                const taiwanCsvUrl = baseUrlTw + "&t=" + new Date().getTime();
                 const response = await fetch(taiwanCsvUrl, { cache: "no-store" });
-                if (!response.ok) throw new Error();
+                if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
-                twStockData = [];
+                
+                let tempTwData = [];
+                let hasValidPrice = false; // 檢查是否有真的抓到非 0 價格
 
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
@@ -222,31 +239,51 @@
                     if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") continue;
 
                     let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
+                    let currentPrice = parseCleanFloat(row[4]);
                     let totalChange = parseCleanFloat(row[5]); 
 
-                    twStockData.push({
+                    if (currentPrice > 0) {
+                        hasValidPrice = true;
+                    }
+
+                    tempTwData.push({
                         code: cleanCode, name: name, shares: shares,
                         yestPrice: parseCleanFloat(row[3]),
-                        currentPrice: parseCleanFloat(row[4]),
+                        currentPrice: currentPrice,
                         totalChange: totalChange,
                         changePercent: parseCleanFloat(row[6])
                     });
                 }
+
+                // 💡 強制防錯機制：如果抓出來的資料全都是 0 (或者 Google 吐空檔)
+                if (tempTwData.length === 0 || !hasValidPrice) {
+                    throw new Error("Data contains all zeros");
+                }
+
+                twStockData = tempTwData;
                 renderTaiwan();
             } catch (e) {
-                document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股網路連線失敗<br><span style="font-size:11px;color:gray;">請檢查台股分頁發布網址</span></div>`;
+                if (twRetryCount < MAX_RETRIES) {
+                    twRetryCount++;
+                    document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:#ee9b00;">台股資料異常，正在進行第 ${twRetryCount} 次強制同步...</div>`;
+                    setTimeout(fetchTaiwanData, 3000); // 3秒後自動再大洗牌重抓一次
+                } else {
+                    document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股同步失敗 (已嘗試 ${MAX_RETRIES} 次)<br><span style="font-size:11px;color:gray;">請稍後重試，或檢查 Google 試算表發布</span></div>`;
+                }
             }
         }
 
         async function fetchUsData() {
             try {
+                const usCsvUrl = baseUrlUs + "&t=" + new Date().getTime();
                 const response = await fetch(usCsvUrl, { cache: "no-store" });
-                if (!response.ok) throw new Error();
+                if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
-                usStockData = [];
+                
+                let tempUsData = [];
+                let hasValidPrice = false;
 
-                // 抓取即時匯率 (對應 G2 儲存格)
                 if (rows[1] && rows[1][6]) {
                     let rate = parseCleanFloat(rows[1][6]);
                     if (rate > 0) usdToTwdRate = rate;
@@ -257,26 +294,39 @@
                     if (!row || row.length < 6) continue;
                     
                     let code = row[0] ? row[0].trim() : "";
-                    const shares = parseCleanFloat(row[1]);      // B欄：持股股數
-                    const yestPrice = parseCleanFloat(row[2]);   // C欄：昨日收盤價
-                    const currentPrice = parseCleanFloat(row[3]);// D欄：單股市價 (今日現價)
-                    const todayChangeUsd = parseCleanFloat(row[4]);// E欄：今日漲跌
-                    const changePercent = parseCleanFloat(row[5]); // F欄：今日漲跌%
+                    const shares = parseCleanFloat(row[1]);      
+                    const yestPrice = parseCleanFloat(row[2]);   
+                    const currentPrice = parseCleanFloat(row[3]);
+                    const todayChangeUsd = parseCleanFloat(row[4]);
+                    const changePercent = parseCleanFloat(row[5]); 
 
                     if (code === "" || isNaN(shares) || shares === 0 || code.includes("股票代號") || code.includes("總計")) continue;
 
-                    usStockData.push({
-                        code: code, 
-                        shares: shares,
-                        yestPrice: yestPrice,
-                        currentPrice: currentPrice,
-                        todayChangeUsd: todayChangeUsd, 
-                        changePercent: changePercent
+                    if (currentPrice > 0) {
+                        hasValidPrice = true;
+                    }
+
+                    tempUsData.push({
+                        code: code, shares: shares, yestPrice: yestPrice,
+                        currentPrice: currentPrice, todayChangeUsd: todayChangeUsd, changePercent: changePercent
                     });
                 }
+
+                // 💡 強制防錯機制：如果美股全抓到 0 
+                if (tempUsData.length === 0 || !hasValidPrice) {
+                    throw new Error("Data contains all zeros");
+                }
+
+                usStockData = tempUsData;
                 renderUs();
             } catch (e) {
-                document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股網路連線失敗<br><span style="font-size:11px;color:gray;">請檢查美股分頁發布網址</span></div>`;
+                if (usRetryCount < MAX_RETRIES) {
+                    usRetryCount++;
+                    document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:#ee9b00;">美股資料異常，正在進行第 ${usRetryCount} 次強制同步...</div>`;
+                    setTimeout(fetchUsData, 3000); // 3秒後自動重新抓取
+                } else {
+                    document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股同步失敗 (已嘗試 ${MAX_RETRIES} 次)<br><span style="font-size:11px;color:gray;">請稍後重試，或檢查 Google 試算表發布</span></div>`;
+                }
             }
         }
 
@@ -365,8 +415,16 @@
             document.getElementById('us-list-container').innerHTML = html;
         }
 
-        fetchTaiwanData();
-        fetchUsData();
+        // 💡 核心優化：iOS 背景回前台自動強制重刷機制
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "visible") {
+                // 當使用者從別的畫面、滑回此 App 的瞬間，立刻重啟同步
+                loadAllData();
+            }
+        });
+
+        // 首次進入頁面初始化載入
+        loadAllData();
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js').catch(() => {});
