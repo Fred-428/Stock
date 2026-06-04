@@ -27,7 +27,7 @@
             padding: 65px 20px 20px 20px;
         }
         
-        /* 頂部切換鈕：擴充為三個按鈕 */
+        /* 頂部切換鈕 */
         .tab-container {
             display: flex;
             background: #e3e3e9;
@@ -184,8 +184,7 @@
         const baseUrlTw = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=0&single=true&output=csv";
         const baseUrlUs = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv";
         
-        // 💡 歷史紀錄分頁的 Google CSV 發布網址
-        // ⚠️ 請把下面這行引號內的網址，換成你剛剛在「第一步」複製的歷史紀錄 CSV 網址！
+        // 💡 您的歷史紀錄 CSV 網址
         const baseUrlHistory = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1681374831&single=true&output=csv";
 
         let twStockData = []; let usStockData = []; let historyData = [];
@@ -223,7 +222,7 @@
             document.getElementById('history-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
             fetchTaiwanData();
             fetchUsData();
-            fetchHistoryData(); // 載入歷史紀錄
+            fetchHistoryData();
         }
 
         async function fetchTaiwanData() {
@@ -308,7 +307,7 @@
             }
         }
 
-        // 💡 網路抓取「歷史紀錄」CSV 邏輯
+        // 💡 精準對齊您的欄位順序：A日期、B市場、C今日損益
         async function fetchHistoryData() {
             try {
                 const historyCsvUrl = baseUrlHistory + "&t=" + new Date().getTime();
@@ -321,18 +320,20 @@
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     if (!row || row.length < 3) continue;
-                    let date = row[0] ? row[0].trim() : "";
-                    let market = row[1] ? row[1].trim() : "";
-                    let profit = parseCleanFloat(row[2]);
-                    if(date === "" || date.includes("日期")) continue;
+                    
+                    let date = row[0] ? row[0].trim() : "";   // A欄是日期
+                    let market = row[1] ? row[1].trim() : ""; // B欄是市場
+                    let profit = parseCleanFloat(row[2]);     // C欄是損益
+                    
+                    if(date === "" || date.includes("日期") || market === "") continue;
 
                     historyData.push({ date: date, market: market, profit: profit });
                 }
-                // 💡 讓最新儲存的歷史日期排在網頁最上面
+                // 最新紀錄置頂
                 historyData.reverse();
                 renderHistory();
             } catch (e) {
-                document.getElementById('history-list-container').innerHTML = `<div class="loading" style="color:red;">歷史紀錄讀取失敗<br><span style="font-size:11px;color:gray;">請確認發布網址是否填寫正確</span></div>`;
+                document.getElementById('history-list-container').innerHTML = `<div class="loading" style="color:red;">歷史紀錄讀取失敗</div>`;
             }
         }
 
@@ -362,102 +363,4 @@
             });
             const box = document.getElementById('tw-total-box');
             box.innerText = (totalProfit >= 0 ? '+' : '') + Math.round(totalProfit).toLocaleString();
-            box.className = 'total-profit ' + (totalProfit >= 0 ? 'tw-up' : 'tw-down');
-            let pct = totalYestValue > 0 ? (totalProfit / totalYestValue) * 100 : 0;
-            const pBox = document.getElementById('tw-percent-box');
-            pBox.innerText = `${totalProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-            pBox.className = `total-percent ${totalProfit >= 0 ? 'tw-up' : 'tw-down'}`;
-            document.getElementById('tw-list-container').innerHTML = html;
-        }
-
-        function renderUs() {
-            let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
-            usStockData.forEach(stock => {
-                totalUsdProfit += stock.todayChangeUsd;
-                if (stock.yestPrice > 0) totalYestUsd += (stock.yestPrice * stock.shares);
-                const cClass = stock.todayChangeUsd >= 0 ? 'us-up' : 'us-down';
-                const sign = stock.todayChangeUsd >= 0 ? '+' : '';
-                html += `
-                    <div class="stock-item">
-                        <div class="stock-row">
-                            <div>
-                                <div class="stock-name">${stock.code}</div>
-                                <div class="stock-sub-container">
-                                    <span class="us-shares">${stock.shares} 股</span>
-                                    <span class="sub-yest">昨收 $${stock.yestPrice.toFixed(2)}</span>
-                                </div>
-                            </div>
-                            <div class="stock-right">
-                                <div class="stock-name">$${stock.currentPrice.toFixed(2)}</div>
-                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}$${stock.todayChangeUsd.toFixed(2)} (${sign}${stock.changePercent.toFixed(2)}%)</div>
-                            </div>
-                        </div>
-                    </div>`;
-            });
-            const box = document.getElementById('us-total-box');
-            box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
-            box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
-            let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
-            const pBox = document.getElementById('us-percent-box');
-            pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-            pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
-            const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
-            const twdBox = document.getElementById('us-twd-box');
-            twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
-            twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
-            document.getElementById('us-list-container').innerHTML = html;
-        }
-
-        // 💡 歷史紀錄畫面渲染
-        function renderHistory() {
-            if (historyData.length === 0) {
-                document.getElementById('history-list-container').innerHTML = `<div class="loading">目前尚無歷史紀錄資料</div>`;
-                return;
-            }
-            let html = '';
-            historyData.forEach(item => {
-                let isUp = item.profit >= 0;
-                let sign = isUp ? '+' : '';
-                let displayValue = '';
-                
-                // 台股格式化為整數 + TWD，美股保留美元符號
-                if (item.market === "台股") {
-                    displayValue = `${sign}${Math.round(item.profit).toLocaleString()} TWD`;
-                } else {
-                    displayValue = `${sign}$${Math.round(item.profit).toLocaleString()}`;
-                }
-
-                // 💡 顏色尊重大大習慣：台股賺紅賠綠，美股賺綠賠紅
-                let colorClass = '';
-                if (item.market === "台股") {
-                    colorClass = isUp ? 'tw-up' : 'tw-down';
-                } else {
-                    colorClass = isUp ? 'us-up' : 'us-down';
-                }
-
-                html += `
-                    <div class="history-item">
-                        <div>
-                            <div class="history-date">${item.date}</div>
-                            <div class="history-market">${item.market}</div>
-                        </div>
-                        <div class="history-value ${colorClass}">${displayValue}</div>
-                    </div>`;
-            });
-            document.getElementById('history-list-container').innerHTML = html;
-        }
-
-        document.addEventListener("visibilitychange", function() {
-            if (document.visibilityState === "visible") {
-                loadAllData();
-            }
-        });
-
-        loadAllData();
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js').catch(() => {});
-        }
-    </script>
-</body>
-</html>
+            box.className = 'total-profit ' + (totalProfit >= 0 ? 'tw-up' : 'tw-down
