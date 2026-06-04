@@ -27,7 +27,7 @@
             padding: 65px 20px 20px 20px;
         }
         
-        /* iOS 原生風格分頁切換鈕 */
+        /* 頂部切換鈕：擴充為三個按鈕 */
         .tab-container {
             display: flex;
             background: #e3e3e9;
@@ -60,7 +60,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
         
-        /* 頂部總金額與趴數分欄 */
         .total-row {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -83,7 +82,6 @@
             white-space: nowrap;
         }
         
-        /* 美股專用次要台幣資訊欄 */
         .total-sub-row {
             font-size: 16px;
             font-weight: 600;
@@ -105,7 +103,6 @@
         }
         .stock-name { font-weight: 600; font-size: 16px; }
         
-        /* 共通子資訊欄設定 */
         .stock-sub-container {
             display: flex;
             font-size: 12px; 
@@ -113,24 +110,13 @@
             margin-top: 4px;
         }
         
-        .tw-shares {
-            width: 72px;       
-            flex-shrink: 0;
-        }
-        
-        .us-shares {
-            width: 48px;       
-            flex-shrink: 0;
-        }
-        
-        .sub-yest {
-            flex-grow: 1;
-        }
-
+        .tw-shares { width: 72px; flex-shrink: 0; }
+        .us-shares { width: 48px; flex-shrink: 0; }
+        .sub-yest { flex-grow: 1; }
         .stock-right { text-align: right; }
         
-        .tw-up { color: var(--stock-red); }     
-        .tw-down { color: var(--stock-green); } 
+        .tw-up, .history-up { color: var(--stock-red); }     
+        .tw-down, .history-down { color: var(--stock-green); } 
         .us-up { color: var(--stock-green); }   
         .us-down { color: var(--stock-red); }     
         
@@ -138,6 +124,19 @@
         
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
+
+        /* 歷史紀錄分頁專用排版樣式 */
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid #e5e5ea;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-date { font-weight: 600; font-size: 16px; color: var(--text-dark); }
+        .history-market { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
+        .history-value { font-weight: 700; font-size: 16px; text-align: right; }
     </style>
 </head>
 <body>
@@ -145,6 +144,7 @@
     <div class="tab-container">
         <button class="tab-btn active" onclick="switchTab('tw')">台股</button>
         <button class="tab-btn" onclick="switchTab('us')">美股</button>
+        <button class="tab-btn" onclick="switchTab('history')">歷史紀錄</button>
     </div>
 
     <div id="panel-tw" class="tab-panel active">
@@ -174,17 +174,23 @@
         </div>
     </div>
 
+    <div id="panel-history" class="tab-panel">
+        <div class="card" style="padding: 10px 20px;">
+            <div id="history-list-container"><div class="loading">資料載入中...</div></div>
+        </div>
+    </div>
+
     <script>
         const baseUrlTw = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=0&single=true&output=csv";
         const baseUrlUs = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv";
+        
+        // 💡 歷史紀錄分頁的 Google CSV 發布網址
+        // ⚠️ 請把下面這行引號內的網址，換成你剛剛在「第一步」複製的歷史紀錄 CSV 網址！
+        const baseUrlHistory = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1681374831&single=true&output=csv";
 
-        let twStockData = [];
-        let usStockData = [];
+        let twStockData = []; let usStockData = []; let historyData = [];
         let usdToTwdRate = 31.47;
-
-        // 追蹤重新嘗試次數，防止無限循環重刷
-        let twRetryCount = 0;
-        let usRetryCount = 0;
+        let twRetryCount = 0; let usRetryCount = 0;
         const MAX_RETRIES = 3;
 
         function parseCleanFloat(val) {
@@ -201,33 +207,33 @@
             if (market === 'tw') {
                 document.querySelectorAll('.tab-btn')[0].classList.add('active');
                 document.getElementById('panel-tw').classList.add('active');
-            } else {
+            } else if (market === 'us') {
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('panel-us').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[2].classList.add('active');
+                document.getElementById('panel-history').classList.add('active');
             }
         }
 
-        // 核心載入邏輯控制中心
         function loadAllData() {
-            twRetryCount = 0;
-            usRetryCount = 0;
+            twRetryCount = 0; usRetryCount = 0;
             document.getElementById('tw-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
             document.getElementById('us-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
+            document.getElementById('history-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
             fetchTaiwanData();
             fetchUsData();
+            fetchHistoryData(); // 載入歷史紀錄
         }
 
         async function fetchTaiwanData() {
             try {
-                // 強制加上毫秒級時間戳，徹底擊穿 Google 快取
                 const taiwanCsvUrl = baseUrlTw + "&t=" + new Date().getTime();
                 const response = await fetch(taiwanCsvUrl, { cache: "no-store" });
                 if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
-                
-                let tempTwData = [];
-                let hasValidPrice = false; // 檢查是否有真的抓到非 0 價格
+                let tempTwData = []; let hasValidPrice = false;
 
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
@@ -235,40 +241,27 @@
                     let rawCode = row[0] ? row[0].trim() : "";
                     const name = row[1] ? row[1].trim() : "";
                     const shares = parseInt(row[2]);
-
                     if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") continue;
 
                     let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
                     let currentPrice = parseCleanFloat(row[4]);
-                    let totalChange = parseCleanFloat(row[5]); 
-
-                    if (currentPrice > 0) {
-                        hasValidPrice = true;
-                    }
+                    if (currentPrice > 0) hasValidPrice = true;
 
                     tempTwData.push({
                         code: cleanCode, name: name, shares: shares,
-                        yestPrice: parseCleanFloat(row[3]),
-                        currentPrice: currentPrice,
-                        totalChange: totalChange,
-                        changePercent: parseCleanFloat(row[6])
+                        yestPrice: parseCleanFloat(row[3]), currentPrice: currentPrice,
+                        totalChange: parseCleanFloat(row[5]), changePercent: parseCleanFloat(row[6])
                     });
                 }
-
-                // 💡 強制防錯機制：如果抓出來的資料全都是 0 (或者 Google 吐空檔)
-                if (tempTwData.length === 0 || !hasValidPrice) {
-                    throw new Error("Data contains all zeros");
-                }
-
+                if (tempTwData.length === 0 || !hasValidPrice) throw new Error("Data contains all zeros");
                 twStockData = tempTwData;
                 renderTaiwan();
             } catch (e) {
                 if (twRetryCount < MAX_RETRIES) {
                     twRetryCount++;
-                    document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:#ee9b00;">台股資料異常，正在進行第 ${twRetryCount} 次強制同步...</div>`;
-                    setTimeout(fetchTaiwanData, 3000); // 3秒後自動再大洗牌重抓一次
+                    setTimeout(fetchTaiwanData, 3000);
                 } else {
-                    document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股同步失敗 (已嘗試 ${MAX_RETRIES} 次)<br><span style="font-size:11px;color:gray;">請稍後重試，或檢查 Google 試算表發布</span></div>`;
+                    document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股同步失敗</div>`;
                 }
             }
         }
@@ -280,9 +273,7 @@
                 if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
-                
-                let tempUsData = [];
-                let hasValidPrice = false;
+                let tempUsData = []; let hasValidPrice = false;
 
                 if (rows[1] && rows[1][6]) {
                     let rate = parseCleanFloat(rows[1][6]);
@@ -292,54 +283,66 @@
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     if (!row || row.length < 6) continue;
-                    
                     let code = row[0] ? row[0].trim() : "";
                     const shares = parseCleanFloat(row[1]);      
                     const yestPrice = parseCleanFloat(row[2]);   
                     const currentPrice = parseCleanFloat(row[3]);
-                    const todayChangeUsd = parseCleanFloat(row[4]);
-                    const changePercent = parseCleanFloat(row[5]); 
-
                     if (code === "" || isNaN(shares) || shares === 0 || code.includes("股票代號") || code.includes("總計")) continue;
-
-                    if (currentPrice > 0) {
-                        hasValidPrice = true;
-                    }
+                    if (currentPrice > 0) hasValidPrice = true;
 
                     tempUsData.push({
-                        code: code, shares: shares, yestPrice: yestPrice,
-                        currentPrice: currentPrice, todayChangeUsd: todayChangeUsd, changePercent: changePercent
+                        code: code, shares: shares, yestPrice: yestPrice, currentPrice: currentPrice,
+                        todayChangeUsd: parseCleanFloat(row[4]), changePercent: parseCleanFloat(row[5])
                     });
                 }
-
-                // 💡 強制防錯機制：如果美股全抓到 0 
-                if (tempUsData.length === 0 || !hasValidPrice) {
-                    throw new Error("Data contains all zeros");
-                }
-
+                if (tempUsData.length === 0 || !hasValidPrice) throw new Error("Data contains all zeros");
                 usStockData = tempUsData;
                 renderUs();
             } catch (e) {
                 if (usRetryCount < MAX_RETRIES) {
                     usRetryCount++;
-                    document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:#ee9b00;">美股資料異常，正在進行第 ${usRetryCount} 次強制同步...</div>`;
-                    setTimeout(fetchUsData, 3000); // 3秒後自動重新抓取
+                    setTimeout(fetchUsData, 3000);
                 } else {
-                    document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股同步失敗 (已嘗試 ${MAX_RETRIES} 次)<br><span style="font-size:11px;color:gray;">請稍後重試，或檢查 Google 試算表發布</span></div>`;
+                    document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股同步失敗</div>`;
                 }
+            }
+        }
+
+        // 💡 網路抓取「歷史紀錄」CSV 邏輯
+        async function fetchHistoryData() {
+            try {
+                const historyCsvUrl = baseUrlHistory + "&t=" + new Date().getTime();
+                const response = await fetch(historyCsvUrl, { cache: "no-store" });
+                if (!response.ok) throw new Error("Network error");
+                const rawData = await response.text();
+                const rows = rawData.split(/\r?\n/).map(row => row.split(','));
+                historyData = [];
+
+                for(let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length < 3) continue;
+                    let date = row[0] ? row[0].trim() : "";
+                    let market = row[1] ? row[1].trim() : "";
+                    let profit = parseCleanFloat(row[2]);
+                    if(date === "" || date.includes("日期")) continue;
+
+                    historyData.push({ date: date, market: market, profit: profit });
+                }
+                // 💡 讓最新儲存的歷史日期排在網頁最上面
+                historyData.reverse();
+                renderHistory();
+            } catch (e) {
+                document.getElementById('history-list-container').innerHTML = `<div class="loading" style="color:red;">歷史紀錄讀取失敗<br><span style="font-size:11px;color:gray;">請確認發布網址是否填寫正確</span></div>`;
             }
         }
 
         function renderTaiwan() {
             let totalProfit = 0; let totalYestValue = 0; let html = '';
-            
             twStockData.forEach(stock => {
                 totalProfit += stock.totalChange;
                 if (stock.yestPrice > 0) totalYestValue += (stock.yestPrice * stock.shares);
-
                 const cClass = stock.totalChange >= 0 ? 'tw-up' : 'tw-down';
                 const sign = stock.totalChange >= 0 ? '+' : '';
-
                 html += `
                     <div class="stock-item">
                         <div class="stock-row">
@@ -357,29 +360,23 @@
                         </div>
                     </div>`;
             });
-
             const box = document.getElementById('tw-total-box');
             box.innerText = (totalProfit >= 0 ? '+' : '') + Math.round(totalProfit).toLocaleString();
             box.className = 'total-profit ' + (totalProfit >= 0 ? 'tw-up' : 'tw-down');
-
             let pct = totalYestValue > 0 ? (totalProfit / totalYestValue) * 100 : 0;
             const pBox = document.getElementById('tw-percent-box');
             pBox.innerText = `${totalProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
             pBox.className = `total-percent ${totalProfit >= 0 ? 'tw-up' : 'tw-down'}`;
-
             document.getElementById('tw-list-container').innerHTML = html;
         }
 
         function renderUs() {
             let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
-
             usStockData.forEach(stock => {
                 totalUsdProfit += stock.todayChangeUsd;
                 if (stock.yestPrice > 0) totalYestUsd += (stock.yestPrice * stock.shares);
-
                 const cClass = stock.todayChangeUsd >= 0 ? 'us-up' : 'us-down';
                 const sign = stock.todayChangeUsd >= 0 ? '+' : '';
-
                 html += `
                     <div class="stock-item">
                         <div class="stock-row">
@@ -397,33 +394,65 @@
                         </div>
                     </div>`;
             });
-
             const box = document.getElementById('us-total-box');
             box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
             box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
-
             let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
             const pBox = document.getElementById('us-percent-box');
             pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
             pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
-
             const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
             const twdBox = document.getElementById('us-twd-box');
             twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
             twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
-
             document.getElementById('us-list-container').innerHTML = html;
         }
 
-        // 💡 核心優化：iOS 背景回前台自動強制重刷機制
+        // 💡 歷史紀錄畫面渲染
+        function renderHistory() {
+            if (historyData.length === 0) {
+                document.getElementById('history-list-container').innerHTML = `<div class="loading">目前尚無歷史紀錄資料</div>`;
+                return;
+            }
+            let html = '';
+            historyData.forEach(item => {
+                let isUp = item.profit >= 0;
+                let sign = isUp ? '+' : '';
+                let displayValue = '';
+                
+                // 台股格式化為整數 + TWD，美股保留美元符號
+                if (item.market === "台股") {
+                    displayValue = `${sign}${Math.round(item.profit).toLocaleString()} TWD`;
+                } else {
+                    displayValue = `${sign}$${Math.round(item.profit).toLocaleString()}`;
+                }
+
+                // 💡 顏色尊重大大習慣：台股賺紅賠綠，美股賺綠賠紅
+                let colorClass = '';
+                if (item.market === "台股") {
+                    colorClass = isUp ? 'tw-up' : 'tw-down';
+                } else {
+                    colorClass = isUp ? 'us-up' : 'us-down';
+                }
+
+                html += `
+                    <div class="history-item">
+                        <div>
+                            <div class="history-date">${item.date}</div>
+                            <div class="history-market">${item.market}</div>
+                        </div>
+                        <div class="history-value ${colorClass}">${displayValue}</div>
+                    </div>`;
+            });
+            document.getElementById('history-list-container').innerHTML = html;
+        }
+
         document.addEventListener("visibilitychange", function() {
             if (document.visibilityState === "visible") {
-                // 當使用者從別的畫面、滑回此 App 的瞬間，立刻重啟同步
                 loadAllData();
             }
         });
 
-        // 首次進入頁面初始化載入
         loadAllData();
 
         if ('serviceWorker' in navigator) {
