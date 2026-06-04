@@ -312,9 +312,11 @@
                 const response = await fetch(historyCsvUrl, { cache: "no-store" });
                 if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
-                const rows = rawData.split(/\r?\n/).map(row => row.split(','));
+                
                 historyData = [];
-
+                const rows = rawData.split(/\r?\n/).map(row => row.split(','));
+                
+                // 取得當前月份
                 const currentMonth = new Date().getMonth() + 1;
                 const currentMonthStr = currentMonth < 10 ? "0" + currentMonth : "" + currentMonth;
 
@@ -322,12 +324,13 @@
                     const row = rows[i];
                     if (!row || row.length < 3) continue;
                     
-                    let date = row[0] ? row[0].trim() : "";   
+                    let date = row[0] ? row[0].trim().replace(/'/g, "") : "";   
                     let market = row[1] ? row[1].trim() : ""; 
                     let profit = parseCleanFloat(row[2]);     
                     
                     if(date === "" || date.includes("日期") || market === "") continue;
 
+                    // 只保留當月資料
                     if (date.substring(0, 2) === currentMonthStr) {
                         historyData.push({ date: date, market: market, profit: profit });
                     }
@@ -345,4 +348,114 @@
                 totalProfit += stock.totalChange;
                 if (stock.yestPrice > 0) totalYestValue += (stock.yestPrice * stock.shares);
                 const cClass = stock.totalChange >= 0 ? 'tw-up' : 'tw-down';
-                const sign = stock.totalChange >=
+                const sign = stock.totalChange >= 0 ? '+' : '';
+                html += `
+                    <div class="stock-item">
+                        <div class="stock-row">
+                            <div>
+                                <div class="stock-name">${stock.name} <span style="font-size:13px; color:var(--text-gray); font-weight:400;">(${stock.code})</span></div>
+                                <div class="stock-sub-container">
+                                    <span class="tw-shares">${stock.shares.toLocaleString()} 股</span>
+                                    <span class="sub-yest">昨收 ${stock.yestPrice.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div class="stock-right">
+                                <div class="stock-name">${stock.currentPrice.toLocaleString()}</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}${Math.round(stock.totalChange).toLocaleString()} (${sign}${stock.changePercent.toFixed(2)}%)</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            const box = document.getElementById('tw-total-box');
+            box.innerText = (totalProfit >= 0 ? '+' : '') + Math.round(totalProfit).toLocaleString();
+            box.className = 'total-profit ' + (totalProfit >= 0 ? 'tw-up' : 'tw-down');
+            let pct = totalYestValue > 0 ? (totalProfit / totalYestValue) * 100 : 0;
+            const pBox = document.getElementById('tw-percent-box');
+            pBox.innerText = `${totalProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            pBox.className = `total-percent ${totalProfit >= 0 ? 'tw-up' : 'tw-down'}`;
+            document.getElementById('tw-list-container').innerHTML = html;
+        }
+
+        function renderUs() {
+            let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
+            usStockData.forEach(stock => {
+                totalUsdProfit += stock.todayChangeUsd;
+                if (stock.yestPrice > 0) totalYestUsd += (stock.yestPrice * stock.shares);
+                const cClass = stock.todayChangeUsd >= 0 ? 'us-up' : 'us-down';
+                const sign = stock.todayChangeUsd >= 0 ? '+' : '';
+                html += `
+                    <div class="stock-item">
+                        <div class="stock-row">
+                            <div>
+                                <div class="stock-name">${stock.code}</div>
+                                <div class="stock-sub-container">
+                                    <span class="us-shares">${stock.shares} 股</span>
+                                    <span class="sub-yest">昨收 $${stock.yestPrice.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div class="stock-right">
+                                <div class="stock-name">$${stock.currentPrice.toFixed(2)}</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}$${stock.todayChangeUsd.toFixed(2)} (${sign}${stock.changePercent.toFixed(2)}%)</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            const box = document.getElementById('us-total-box');
+            box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
+            box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
+            let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
+            const pBox = document.getElementById('us-percent-box');
+            pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
+            const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
+            const twdBox = document.getElementById('us-twd-box');
+            twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
+            twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
+            document.getElementById('us-list-container').innerHTML = html;
+        }
+
+        function renderHistory() {
+            if (historyData.length === 0) {
+                document.getElementById('history-list-container').innerHTML = `<div class="loading">目前尚無本月歷史紀錄資料</div>`;
+                return;
+            }
+            let html = '';
+            historyData.forEach(item => {
+                let isUp = item.profit >= 0;
+                let sign = isUp ? '+' : '';
+                let displayValue = `${sign}${Math.round(item.profit).toLocaleString()}`;
+
+                let colorClass = isUp ? 'history-up' : 'history-down'; // 正紅負綠
+                let extraItemClass = '';
+                
+                if (item.market === "當月總損益") {
+                    extraItemClass = 'month-summary'; 
+                    displayValue = `當月結算: ${displayValue}`;
+                }
+
+                html += `
+                    <div class="history-item ${extraItemClass}">
+                        <div>
+                            <div class="history-date">${item.date}</div>
+                            <div class="history-market">${item.market}</div>
+                        </div>
+                        <div class="history-value ${colorClass}">${displayValue}</div>
+                    </div>`;
+            });
+            document.getElementById('history-list-container').innerHTML = html;
+        }
+
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "visible") {
+                loadAllData();
+            }
+        });
+
+        loadAllData();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
