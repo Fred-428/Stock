@@ -86,7 +86,6 @@
         .total-sub-row {
             font-size: 16px;
             font-weight: 600;
-            color: var(--text-gray);
             margin-top: 6px;
             text-align: left;
         }
@@ -116,7 +115,7 @@
         .sub-yest { flex-grow: 1; }
         .stock-right { text-align: right; }
         
-        /* 統一正數（紅）與負數（綠）的顏色設定 */
+        /* 💡 乾淨直覺：全網頁只要是 up 就是紅（賺），down 就是綠（賠） */
         .tw-up, .us-up, .history-up { color: var(--stock-red); }     
         .tw-down, .us-down, .history-down { color: var(--stock-green); } 
         
@@ -316,7 +315,6 @@
                 historyData = [];
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
                 
-                // 取得當前月份
                 const currentMonth = new Date().getMonth() + 1;
                 const currentMonthStr = currentMonth < 10 ? "0" + currentMonth : "" + currentMonth;
 
@@ -330,7 +328,6 @@
                     
                     if(date === "" || date.includes("日期") || market === "") continue;
 
-                    // 只保留當月資料
                     if (date.substring(0, 2) === currentMonthStr) {
                         historyData.push({ date: date, market: market, profit: profit });
                     }
@@ -407,10 +404,13 @@
             const pBox = document.getElementById('us-percent-box');
             pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
             pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
+            
+            // 💡 修正這裡：換算台幣欄位的字體顏色，依據總損益正負直接綁定 us-up 或 us-down
             const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
             const twdBox = document.getElementById('us-twd-box');
             twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
-            twdBox.style.color = totalUsdProfit >= 0 ? 'var(--stock-green)' : 'var(--stock-red)';
+            twdBox.className = 'total-sub-row ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
+            
             document.getElementById('us-list-container').innerHTML = html;
         }
 
@@ -425,7 +425,7 @@
                 let sign = isUp ? '+' : '';
                 let displayValue = `${sign}${Math.round(item.profit).toLocaleString()}`;
 
-                let colorClass = isUp ? 'history-up' : 'history-down'; // 正紅負綠
+                let colorClass = isUp ? 'history-up' : 'history-down'; 
                 let extraItemClass = '';
                 
                 if (item.market === "當月總損益") {
