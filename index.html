@@ -18,7 +18,13 @@
             --stock-green: #28a745;
             --text-dark: #1c1c1e;
             --text-gray: #8e8e93;
-            --total-blue: #007aff;
+            
+            /* 歷史紀錄日曆專用暗黑風格變數 */
+            --cal-bg: #1c1c1e;
+            --cal-card: #2c2c2e;
+            --cal-text: #ffffff;
+            --cal-red-bg: #8b1e20;
+            --cal-green-bg: #145a2d;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -26,6 +32,13 @@
             color: var(--text-dark);
             margin: 0;
             padding: 65px 20px 20px 20px;
+            transition: background 0.3s;
+        }
+        
+        /* 當切換到歷史紀錄時，主體背景變暗黑風格 */
+        body.history-mode {
+            background-color: var(--cal-bg);
+            color: var(--cal-text);
         }
         
         /* 頂部切換鈕 */
@@ -35,6 +48,9 @@
             border-radius: 8px;
             padding: 2px;
             margin-bottom: 20px;
+        }
+        body.history-mode .tab-container {
+            background: #2c2c2e;
         }
         .tab-btn {
             flex: 1;
@@ -48,9 +64,17 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+        body.history-mode .tab-btn {
+            color: #aaaaaa;
+        }
         .tab-btn.active {
             background: #ffffff;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: var(--text-dark);
+        }
+        body.history-mode .tab-btn.active {
+            background: #48484a;
+            color: var(--cal-text);
         }
 
         .card {
@@ -59,6 +83,10 @@
             padding: 20px;
             margin-bottom: 16px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
+        body.history-mode .card {
+            background-color: var(--cal-card);
+            box-shadow: none;
         }
         
         .total-row {
@@ -115,28 +143,92 @@
         .sub-yest { flex-grow: 1; }
         .stock-right { text-align: right; }
         
-        /* 💡 乾淨直覺：全網頁只要是 up 就是紅（賺），down 就是綠（賠） */
-        .tw-up, .us-up, .history-up { color: var(--stock-red); }     
-        .tw-down, .us-down, .history-down { color: var(--stock-green); } 
+        .tw-up, .us-up { color: var(--stock-red); }     
+        .tw-down, .us-down { color: var(--stock-green); } 
         
         .loading { text-align: center; color: var(--text-gray); padding: 40px; font-size: 14px; line-height: 1.6; }
         
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* 歷史紀錄分頁專用排版樣式 */
-        .history-item {
+        /* ==================== 報酬日曆專用樣式 ==================== */
+        .cal-header-selector {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 14px 0;
-            border-bottom: 1px solid #e5e5ea;
+            margin-bottom: 12px;
         }
-        .history-item:last-child { border-bottom: none; }
-        .history-date { font-weight: 600; font-size: 16px; color: var(--text-dark); }
-        .history-market { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
-        .history-value { font-weight: 700; font-size: 16px; text-align: right; }
-        .history-item.month-summary { background-color: #fafdff; margin: 0 -20px; padding: 14px 20px; border-top: 1px dashed #007aff; border-bottom: 1px dashed #007aff;}
+        .cal-selector-btn {
+            background: #3a3a3c;
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .cal-month-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .calendar-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+            table-layout: fixed;
+        }
+        .calendar-table th {
+            color: #8e8e93;
+            font-size: 13px;
+            font-weight: 500;
+            padding-bottom: 8px;
+            text-align: center;
+        }
+        .calendar-table td {
+            background-color: #2c2c2e;
+            border-radius: 8px;
+            height: 62px;
+            vertical-align: top;
+            padding: 4px;
+            position: relative;
+        }
+        .cal-day-num {
+            font-size: 11px;
+            font-weight: 600;
+            color: #8e8e93;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .cal-day-profit {
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .cal-day-pct {
+            font-size: 9px;
+            text-align: center;
+            display: block;
+            opacity: 0.8;
+        }
+        /* 顏色套用：紅底與綠底 */
+        .cal-cell-up { background-color: var(--cal-red-bg) !important; color: #ffffff; }
+        .cal-cell-down { background-color: var(--cal-green-bg) !important; color: #ffffff; }
+        .cal-cell-up .cal-day-num, .cal-cell-down .cal-day-num { color: rgba(255,255,255,0.6); }
+        
+        /* 週損益特殊欄位 */
+        .cal-week-total-cell {
+            background-color: #3a3a3c !important;
+            color: #ffffff;
+        }
+        .cal-text-up { color: #ff453a; }
+        .cal-text-down { color: #30d158; }
+        .calendar-table td.empty-cell {
+            background-color: transparent !important;
+        }
     </style>
 </head>
 <body>
@@ -144,7 +236,7 @@
     <div class="tab-container">
         <button class="tab-btn active" onclick="switchTab('tw')">台股</button>
         <button class="tab-btn" onclick="switchTab('us')">美股</button>
-        <button class="tab-btn" onclick="switchTab('history')">歷史紀錄</button>
+        <button class="tab-btn" onclick="switchTab('history')">報酬日曆</button>
     </div>
 
     <div id="panel-tw" class="tab-panel active">
@@ -175,8 +267,22 @@
     </div>
 
     <div id="panel-history" class="tab-panel">
-        <div class="card" style="padding: 10px 20px;">
-            <div id="history-list-container"><div class="loading">資料載入中...</div></div>
+        <div class="card">
+            <div id="cal-summary-title" style="color: var(--text-gray); font-size: 14px; font-weight: 500;">當月累積總報酬</div>
+            <div class="total-row">
+                <span id="cal-total-box" class="total-profit" style="color:#fff;">—</span>
+                <span id="cal-percent-box" class="total-percent" style="color:#fff;">—</span>
+            </div>
+        </div>
+        
+        <div class="cal-header-selector">
+            <button class="cal-selector-btn" onclick="changeMonth(-1)">◀ 上個月</button>
+            <div id="cal-current-month-display" class="cal-month-title">—</div>
+            <button class="cal-selector-btn" onclick="changeMonth(1)">下個月 ▶</button>
+        </div>
+
+        <div id="history-calendar-container">
+            <div class="loading">資料載入中...</div>
         </div>
     </div>
 
@@ -185,14 +291,17 @@
         const baseUrlUs = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv";
         const baseUrlHistory = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1681374831&single=true&output=csv";
 
-        let twStockData = []; let usStockData = []; let historyData = [];
+        let twStockData = []; let usStockData = []; 
+        let rawHistoryRows = []; // 存放完整的歷史原始資料
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth() + 1; // 1~12
         let usdToTwdRate = 31.47;
         let twRetryCount = 0; let usRetryCount = 0;
         const MAX_RETRIES = 3;
 
         function parseCleanFloat(val) {
             if (!val) return 0;
-            let s = val.toString().replace(/%/g, '').replace(/[^\d.-]/g, '').trim();
+            let s = val.toString().replace(/,/g, '').replace(/%/g, '').replace(/[^\d.-]/g, '').trim();
             let n = parseFloat(s);
             return isNaN(n) ? 0 : n;
         }
@@ -202,22 +311,33 @@
             document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
             
             if (market === 'tw') {
+                document.body.classList.remove('history-mode');
                 document.querySelectorAll('.tab-btn')[0].classList.add('active');
                 document.getElementById('panel-tw').classList.add('active');
             } else if (market === 'us') {
+                document.body.classList.remove('history-mode');
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('panel-us').classList.add('active');
             } else {
+                document.body.add('history-mode'); // 進入日曆時切換成暗黑風格
                 document.querySelectorAll('.tab-btn')[2].classList.add('active');
                 document.getElementById('panel-history').classList.add('active');
+                renderCalendarView();
             }
+        }
+
+        function changeMonth(offset) {
+            currentMonth += offset;
+            if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+            if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+            renderCalendarView();
         }
 
         function loadAllData() {
             twRetryCount = 0; usRetryCount = 0;
             document.getElementById('tw-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
             document.getElementById('us-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
-            document.getElementById('history-list-container').innerHTML = `<div class="loading">資料載入中...</div>`;
+            document.getElementById('history-calendar-container').innerHTML = `<div class="loading">資料載入中...</div>`;
             fetchTaiwanData();
             fetchUsData();
             fetchHistoryData();
@@ -254,12 +374,8 @@
                 twStockData = tempTwData;
                 renderTaiwan();
             } catch (e) {
-                if (twRetryCount < MAX_RETRIES) {
-                    twRetryCount++;
-                    setTimeout(fetchTaiwanData, 3000);
-                } else {
-                    document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股同步失敗</div>`;
-                }
+                if (twRetryCount < MAX_RETRIES) { twRetryCount++; setTimeout(fetchTaiwanData, 3000); } 
+                else { document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股同步失敗</div>`; }
             }
         }
 
@@ -296,12 +412,8 @@
                 usStockData = tempUsData;
                 renderUs();
             } catch (e) {
-                if (usRetryCount < MAX_RETRIES) {
-                    usRetryCount++;
-                    setTimeout(fetchUsData, 3000);
-                } else {
-                    document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股同步失敗</div>`;
-                }
+                if (usRetryCount < MAX_RETRIES) { usRetryCount++; setTimeout(fetchUsData, 3000); } 
+                else { document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股同步失敗</div>`; }
             }
         }
 
@@ -312,30 +424,12 @@
                 if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
                 
-                historyData = [];
-                const rows = rawData.split(/\r?\n/).map(row => row.split(','));
-                
-                const currentMonth = new Date().getMonth() + 1;
-                const currentMonthStr = currentMonth < 10 ? "0" + currentMonth : "" + currentMonth;
-
-                for(let i = 1; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (!row || row.length < 3) continue;
-                    
-                    let date = row[0] ? row[0].trim().replace(/'/g, "") : "";   
-                    let market = row[1] ? row[1].trim() : ""; 
-                    let profit = parseCleanFloat(row[2]);     
-                    
-                    if(date === "" || date.includes("日期") || market === "") continue;
-
-                    if (date.substring(0, 2) === currentMonthStr) {
-                        historyData.push({ date: date, market: market, profit: profit });
-                    }
+                rawHistoryRows = rawData.split(/\r?\n/).map(row => row.split(','));
+                if (document.getElementById('panel-history').classList.contains('active')) {
+                    renderCalendarView();
                 }
-                historyData.reverse();
-                renderHistory();
             } catch (e) {
-                document.getElementById('history-list-container').innerHTML = `<div class="loading" style="color:red;">歷史紀錄讀取失敗</div>`;
+                document.getElementById('history-calendar-container').innerHTML = `<div class="loading" style="color:red;">歷史紀錄讀取失敗</div>`;
             }
         }
 
@@ -405,7 +499,6 @@
             pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
             pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
             
-            // 💡 修正這裡：換算台幣欄位的字體顏色，依據總損益正負直接綁定 us-up 或 us-down
             const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
             const twdBox = document.getElementById('us-twd-box');
             twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
@@ -414,35 +507,158 @@
             document.getElementById('us-list-container').innerHTML = html;
         }
 
-        function renderHistory() {
-            if (historyData.length === 0) {
-                document.getElementById('history-list-container').innerHTML = `<div class="loading">目前尚無本月歷史紀錄資料</div>`;
-                return;
-            }
-            let html = '';
-            historyData.forEach(item => {
-                let isUp = item.profit >= 0;
-                let sign = isUp ? '+' : '';
-                let displayValue = `${sign}${Math.round(item.profit).toLocaleString()}`;
+        // ==================== 核心功能：渲染日曆視圖 ====================
+        function renderCalendarView() {
+            if (rawHistoryRows.length === 0) return;
 
-                let colorClass = isUp ? 'history-up' : 'history-down'; 
-                let extraItemClass = '';
+            // 格式化當前選取月份為字串 "MM"
+            const searchMonthStr = currentMonth < 10 ? "0" + currentMonth : "" + currentMonth;
+            document.getElementById('cal-current-month-display').innerText = `${currentYear}/${searchMonthStr} 報酬`;
+
+            // 1. 解析並合併當天「台股＋美股」的金額
+            // 建立一個 map 結構，key 為日曆天日 (例如 "05")，value 為加總損益
+            let dailyCombinedMap = {};
+            let monthlyTotalSum = 0; // 當月累積總和
+
+            for (let i = 1; i < rawHistoryRows.length; i++) {
+                const row = rawHistoryRows[i];
+                if (!row || row.length < 3) continue;
+
+                let dateRaw = row[0] ? row[0].trim().replace(/'/g, "") : ""; // 移除單引號
+                let market = row[1] ? row[1].trim() : "";
+                let profit = parseCleanFloat(row[2]);
+
+                if (dateRaw === "" || market === "" || market === "當月總損益") continue;
+
+                // 檢查是否符合當前選定的月份
+                if (dateRaw.substring(0, 2) === searchMonthStr) {
+                    let dayKey = parseInt(dateRaw.substring(3, 5)).toString(); // "05" -> "5"
+                    if (!dailyCombinedMap[dayKey]) {
+                        dailyCombinedMap[dayKey] = 0;
+                    }
+                    dailyCombinedMap[dayKey] += profit;
+                    monthlyTotalSum += profit;
+                }
+            }
+
+            // 更新頂部總報酬卡片金額
+            const totalBox = document.getElementById('cal-total-box');
+            totalBox.innerText = (monthlyTotalSum >= 0 ? '+' : '') + Math.round(monthlyTotalSum).toLocaleString();
+            totalBox.className = 'total-profit ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
+            
+            // 由於歷史紀錄沒有直接存放當月總本金，這裡用總損益是否大於 0 顯示對應的正負顏色
+            const percentBox = document.getElementById('cal-percent-box');
+            percentBox.innerText = monthlyTotalSum >= 0 ? "獲利" : "虧損";
+            percentBox.className = 'total-percent ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
+
+            // 2. 開始構建日曆網格（固定週一到週五，加最後一欄週損益）
+            // 計算當月天數與每日對應星期幾
+            // 注意：JavaScript 月份為 0~11
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+            
+            let html = `
+                <table class="calendar-table">
+                    <thead>
+                        <tr>
+                            <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th>
+                            <th style="color:#007aff;">週損益</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            let currentWeekProfit = 0; // 週累計
+            let hasWeekData = false;
+
+            // 遍歷當月的每一天
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dateObj = new Date(currentYear, currentMonth - 1, d);
+                let dayOfWeek = dateObj.getDay(); // 0(日) 到 6(六)
+
+                // 略過週末不渲染成格子
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    // 如果月底剛好是週六/週日，且該週有數據，就必須做完當週的總結結尾
+                    if (d === daysInMonth && hasWeekData) {
+                        html += `<td class="cal-week-total-cell">
+                                    <span class="cal-day-num" style="color:#007aff;">TOTAL</span>
+                                    <span class="cal-day-profit ${currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down'}">
+                                        ${currentWeekProfit >= 0 ? '+' : ''}${Math.round(currentWeekProfit).toLocaleString()}
+                                    </span>
+                                 </td></tr>`;
+                    }
+                    continue; 
+                }
+
+                // 如果是週一，或是每個月的第一天，開新的一列（<tr>）
+                if (dayOfWeek === 1 || html.endsWith('</tr>') || d === 1) {
+                    if (!html.endsWith('<tr>') && d === 1) {
+                        html += '<tr>';
+                        // 補足前面非週一的空格式 (例如當月第一天是週三，補週一週二空欄)
+                        let blanks = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                        for (let b = 0; b < blanks; b++) {
+                            html += '<td class="empty-cell"></td>';
+                        }
+                    } else if (d !== 1) {
+                        html += '<tr>';
+                    }
+                    currentWeekProfit = 0;
+                    hasWeekData = false;
+                }
+
+                // 填入當天的數據
+                let dayStr = d.toString();
+                let hasData = dailyCombinedMap[dayStr] !== undefined;
+                let dayProfit = hasData ? dailyCombinedMap[dayStr] : 0;
                 
-                if (item.market === "當月總損益") {
-                    extraItemClass = 'month-summary'; 
-                    displayValue = `當月結算: ${displayValue}`;
+                let cellClass = '';
+                let displayProfit = '';
+                
+                if (hasData) {
+                    currentWeekProfit += dayProfit;
+                    hasWeekData = true;
+                    cellClass = dayProfit >= 0 ? 'cal-cell-up' : 'cal-cell-down';
+                    
+                    // 金額格式轉換：大於萬用「萬」表達，小於萬用整數
+                    if (Math.abs(dayProfit) >= 10000) {
+                        displayProfit = (dayProfit / 10000).toFixed(1) + '萬';
+                    } else {
+                        displayProfit = Math.round(dayProfit).toLocaleString();
+                    }
+                    displayProfit = (dayProfit >= 0 ? '+' : '') + displayProfit;
                 }
 
                 html += `
-                    <div class="history-item ${extraItemClass}">
-                        <div>
-                            <div class="history-date">${item.date}</div>
-                            <div class="history-market">${item.market}</div>
-                        </div>
-                        <div class="history-value ${colorClass}">${displayValue}</div>
-                    </div>`;
-            });
-            document.getElementById('history-list-container').innerHTML = html;
+                    <td class="${cellClass}">
+                        <span class="cal-day-num">${d}</span>
+                        <span class="cal-day-profit">${displayProfit}</span>
+                    </td>`;
+
+                // 如果是週五，或是當月的最後一天，計算並封閉週損益欄位
+                if (dayOfWeek === 5 || d === daysInMonth) {
+                    // 如果到了月底，且還沒到週五，先補滿空欄位直到週五前方
+                    if (dayOfWeek !== 5 && d === daysInMonth) {
+                        for (let b = dayOfWeek; b < 5; b++) {
+                            html += '<td class="empty-cell"></td>';
+                        }
+                    }
+                    
+                    let weekTotalStr = '—';
+                    let weekClass = '';
+                    if (hasWeekData) {
+                        weekTotalStr = (currentWeekProfit >= 0 ? '+' : '') + (currentWeekProfit / 10000).toFixed(1) + '萬';
+                        weekClass = currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down';
+                    }
+                    
+                    html += `
+                        <td class="cal-week-total-cell">
+                            <span class="cal-day-num" style="color:#007aff;">WEEK</span>
+                            <span class="cal-day-profit ${weekClass}">${weekTotalStr}</span>
+                        </td>
+                    </tr>`;
+                }
+            }
+
+            html += `</tbody></table>`;
+            document.getElementById('history-calendar-container').innerHTML = html;
         }
 
         document.addEventListener("visibilitychange", function() {
