@@ -28,21 +28,30 @@
             --cal-green-bg: #e6f4ea;  
             --cal-green-text: #28a745;
         }
+        
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--ios-bg);
             color: var(--text-dark);
             margin: 0;
-            padding: 20px;
+            padding: 0 20px 40px 20px;
         }
         
-        /* 頂部切換鈕 */
+        /* 頂部切換鈕：獨立置頂並防止 iOS 劉海/動態島遮擋 */
         .tab-container {
+            position: sticky;
+            top: 0;
+            z-index: 999;
             display: flex;
             background: #e3e3e9;
             border-radius: 8px;
             padding: 2px;
             margin-bottom: 20px;
+            margin-top: calc(12px + env(safe-area-inset-top));
         }
         .tab-btn {
             flex: 1;
@@ -72,8 +81,8 @@
         }
         
         .total-row {
-            display: grid;
-            grid-template-columns: 1fr auto;
+            display: flex;
+            justify-content: space-between;
             align-items: baseline;          
             margin: 10px 0 0 0;
             gap: 10px;
@@ -307,7 +316,7 @@
             <div id="cal-summary-title" style="color: var(--text-gray); font-size: 14px; font-weight: 500;">當月累積總報酬</div>
             <div class="total-row">
                 <span id="cal-total-box" class="total-profit">—</span>
-                <span id="cal-percent-box" class="total-percent">—</span>
+                <span id="cal-percent-box" class="total-percent" style="display:none;"></span>
             </div>
         </div>
         
@@ -348,8 +357,8 @@
         let twStockData = []; 
         let usStockData = []; 
         let rawHistoryRows = []; 
-        let currentYear = 2026; // 固定 2026 年配合資料時間
-        let currentMonth = 6;    // 固定 6 月配合資料時間
+        let currentYear = 2026; 
+        let currentMonth = 6;    
         let usdToTwdRate = 31.89;
         let twRetryCount = 0; 
         let usRetryCount = 0;
@@ -433,11 +442,11 @@
                 if (!response.ok) throw new Error("Network error");
                 const rawData = await response.text();
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
-                let tempTwData = []; let hasValidPrice = false;
+                let tempTwData = [];
 
                 for(let i = 1; i < rows.length; i++) {
                     const row = rows[i];
-                    if (!row || row.length < 3) continue; // 💡 寬鬆防呆：只要有基本的前三欄就放行，不卡死長度
+                    if (!row || row.length < 3) continue;
                     
                     let rawCode = row[0] ? row[0].trim() : "";
                     const name = row[1] ? row[1].trim() : "";
@@ -446,8 +455,6 @@
 
                     let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
                     let currentPrice = parseCleanFloat(row[4]);
-                    if (currentPrice > 0) hasValidPrice = true;
-
                     let tChange = row[5] ? row[5] : 0;
                     let pChange = row[6] ? row[6] : 0;
 
@@ -635,10 +642,6 @@
             const totalBox = document.getElementById('cal-total-box');
             totalBox.innerText = (monthlyTotalSum >= 0 ? '+' : '') + Math.round(monthlyTotalSum).toLocaleString();
             totalBox.className = 'total-profit ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
-            
-            const percentBox = document.getElementById('cal-percent-box');
-            percentBox.innerText = monthlyTotalSum >= 0 ? "獲利" : "虧損";
-            percentBox.className = 'total-percent ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
 
             const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
             
@@ -664,7 +667,7 @@
                         html += `<td class="cal-week-total-cell">
                                     <span class="cal-day-num" style="color:#007aff;">TOTAL</span>
                                     <span class="cal-day-profit ${currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down'}">
-                                        ${currentWeekProfit >= 0 ? '+' : ''}${Math.round(currentWeekProfit).toLocaleString()}
+                                        ${currentWeekProfit >= 0 ? '+' : ''}${(currentWeekProfit / 10000).toFixed(1)}
                                     </span>
                                  </td></tr>`;
                     }
@@ -699,11 +702,8 @@
                     cellClass = dayProfit >= 0 ? 'cal-cell-up has-data-cell' : 'cal-cell-down has-data-cell';
                     onClickAttribute = `onclick="showDayDetails(${d})"`;
                     
-                    if (Math.abs(dayProfit) >= 10000) {
-                        displayProfit = (dayProfit / 10000).toFixed(1) + '萬';
-                    } else {
-                        displayProfit = Math.round(dayProfit).toLocaleString();
-                    }
+                    // 💡 去掉「萬」字，僅留純數字格式
+                    displayProfit = (dayProfit / 10000).toFixed(1);
                     displayProfit = (dayProfit >= 0 ? '+' : '') + displayProfit;
                 }
 
@@ -723,7 +723,8 @@
                     let weekTotalStr = '—';
                     let weekClass = '';
                     if (hasWeekData) {
-                        weekTotalStr = (currentWeekProfit >= 0 ? '+' : '') + (currentWeekProfit / 10000).toFixed(1) + '萬';
+                        // 💡 週報酬同樣去掉「萬」字
+                        weekTotalStr = (currentWeekProfit >= 0 ? '+' : '') + (currentWeekProfit / 10000).toFixed(1);
                         weekClass = currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down';
                     }
                     
