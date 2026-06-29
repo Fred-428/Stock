@@ -32,7 +32,7 @@
             color: var(--text-dark);
             margin: 0;
             padding: 65px 20px 20px 20px;
-            transition: background 0.3s;
+            transition: background 0.3s, color 0.3s;
         }
         
         /* 當切換到歷史紀錄時，主體背景變暗黑風格 */
@@ -122,6 +122,9 @@
             padding: 14px 0;
             border-bottom: 1px solid #e5e5ea;
         }
+        body.history-mode .stock-item {
+            border-bottom: 1px solid #38383a;
+        }
         .stock-item:last-child { border-bottom: none; }
         
         .stock-row {
@@ -208,13 +211,7 @@
             white-space: nowrap;
             overflow: hidden;
         }
-        .cal-day-pct {
-            font-size: 9px;
-            text-align: center;
-            display: block;
-            opacity: 0.8;
-        }
-        /* 顏色套用：紅底與綠底 */
+        /* 紅底與綠底顏色方案 */
         .cal-cell-up { background-color: var(--cal-red-bg) !important; color: #ffffff; }
         .cal-cell-down { background-color: var(--cal-green-bg) !important; color: #ffffff; }
         .cal-cell-up .cal-day-num, .cal-cell-down .cal-day-num { color: rgba(255,255,255,0.6); }
@@ -291,12 +288,14 @@
         const baseUrlUs = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1782146073&single=true&output=csv";
         const baseUrlHistory = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNYIcDpAHT6NxWouOHTC60ej1Fff3diBlP5iEsTbzXmsw6NO8c7OGy1F681Qaf1M1_-j4fmFYENFYw/pub?gid=1681374831&single=true&output=csv";
 
-        let twStockData = []; let usStockData = []; 
-        let rawHistoryRows = []; // 存放完整的歷史原始資料
+        let twStockData = []; 
+        let usStockData = []; 
+        let rawHistoryRows = []; 
         let currentYear = new Date().getFullYear();
-        let currentMonth = new Date().getMonth() + 1; // 1~12
+        let currentMonth = new Date().getMonth() + 1; 
         let usdToTwdRate = 31.47;
-        let twRetryCount = 0; let usRetryCount = 0;
+        let twRetryCount = 0; 
+        let usRetryCount = 0;
         const MAX_RETRIES = 3;
 
         function parseCleanFloat(val) {
@@ -319,7 +318,8 @@
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('panel-us').classList.add('active');
             } else {
-                document.body.add('history-mode'); // 進入日曆時切換成暗黑風格
+                // 💡 修正處：正確補上 classList
+                document.body.classList.add('history-mode'); 
                 document.querySelectorAll('.tab-btn')[2].classList.add('active');
                 document.getElementById('panel-history').classList.add('active');
                 renderCalendarView();
@@ -507,32 +507,27 @@
             document.getElementById('us-list-container').innerHTML = html;
         }
 
-        // ==================== 核心功能：渲染日曆視圖 ====================
         function renderCalendarView() {
             if (rawHistoryRows.length === 0) return;
 
-            // 格式化當前選取月份為字串 "MM"
             const searchMonthStr = currentMonth < 10 ? "0" + currentMonth : "" + currentMonth;
             document.getElementById('cal-current-month-display').innerText = `${currentYear}/${searchMonthStr} 報酬`;
 
-            // 1. 解析並合併當天「台股＋美股」的金額
-            // 建立一個 map 結構，key 為日曆天日 (例如 "05")，value 為加總損益
             let dailyCombinedMap = {};
-            let monthlyTotalSum = 0; // 當月累積總和
+            let monthlyTotalSum = 0; 
 
             for (let i = 1; i < rawHistoryRows.length; i++) {
                 const row = rawHistoryRows[i];
                 if (!row || row.length < 3) continue;
 
-                let dateRaw = row[0] ? row[0].trim().replace(/'/g, "") : ""; // 移除單引號
+                let dateRaw = row[0] ? row[0].trim().replace(/'/g, "") : ""; 
                 let market = row[1] ? row[1].trim() : "";
                 let profit = parseCleanFloat(row[2]);
 
                 if (dateRaw === "" || market === "" || market === "當月總損益") continue;
 
-                // 檢查是否符合當前選定的月份
                 if (dateRaw.substring(0, 2) === searchMonthStr) {
-                    let dayKey = parseInt(dateRaw.substring(3, 5)).toString(); // "05" -> "5"
+                    let dayKey = parseInt(dateRaw.substring(3, 5)).toString(); 
                     if (!dailyCombinedMap[dayKey]) {
                         dailyCombinedMap[dayKey] = 0;
                     }
@@ -541,19 +536,14 @@
                 }
             }
 
-            // 更新頂部總報酬卡片金額
             const totalBox = document.getElementById('cal-total-box');
             totalBox.innerText = (monthlyTotalSum >= 0 ? '+' : '') + Math.round(monthlyTotalSum).toLocaleString();
             totalBox.className = 'total-profit ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
             
-            // 由於歷史紀錄沒有直接存放當月總本金，這裡用總損益是否大於 0 顯示對應的正負顏色
             const percentBox = document.getElementById('cal-percent-box');
             percentBox.innerText = monthlyTotalSum >= 0 ? "獲利" : "虧損";
             percentBox.className = 'total-percent ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
 
-            // 2. 開始構建日曆網格（固定週一到週五，加最後一欄週損益）
-            // 計算當月天數與每日對應星期幾
-            // 注意：JavaScript 月份為 0~11
             const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
             
             let html = `
@@ -566,17 +556,14 @@
                     </thead>
                     <tbody>`;
 
-            let currentWeekProfit = 0; // 週累計
+            let currentWeekProfit = 0; 
             let hasWeekData = false;
 
-            // 遍歷當月的每一天
             for (let d = 1; d <= daysInMonth; d++) {
                 let dateObj = new Date(currentYear, currentMonth - 1, d);
-                let dayOfWeek = dateObj.getDay(); // 0(日) 到 6(六)
+                let dayOfWeek = dateObj.getDay(); 
 
-                // 略過週末不渲染成格子
                 if (dayOfWeek === 0 || dayOfWeek === 6) {
-                    // 如果月底剛好是週六/週日，且該週有數據，就必須做完當週的總結結尾
                     if (d === daysInMonth && hasWeekData) {
                         html += `<td class="cal-week-total-cell">
                                     <span class="cal-day-num" style="color:#007aff;">TOTAL</span>
@@ -588,11 +575,9 @@
                     continue; 
                 }
 
-                // 如果是週一，或是每個月的第一天，開新的一列（<tr>）
                 if (dayOfWeek === 1 || html.endsWith('</tr>') || d === 1) {
                     if (!html.endsWith('<tr>') && d === 1) {
                         html += '<tr>';
-                        // 補足前面非週一的空格式 (例如當月第一天是週三，補週一週二空欄)
                         let blanks = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
                         for (let b = 0; b < blanks; b++) {
                             html += '<td class="empty-cell"></td>';
@@ -604,7 +589,6 @@
                     hasWeekData = false;
                 }
 
-                // 填入當天的數據
                 let dayStr = d.toString();
                 let hasData = dailyCombinedMap[dayStr] !== undefined;
                 let dayProfit = hasData ? dailyCombinedMap[dayStr] : 0;
@@ -617,7 +601,6 @@
                     hasWeekData = true;
                     cellClass = dayProfit >= 0 ? 'cal-cell-up' : 'cal-cell-down';
                     
-                    // 金額格式轉換：大於萬用「萬」表達，小於萬用整數
                     if (Math.abs(dayProfit) >= 10000) {
                         displayProfit = (dayProfit / 10000).toFixed(1) + '萬';
                     } else {
@@ -632,9 +615,7 @@
                         <span class="cal-day-profit">${displayProfit}</span>
                     </td>`;
 
-                // 如果是週五，或是當月的最後一天，計算並封閉週損益欄位
                 if (dayOfWeek === 5 || d === daysInMonth) {
-                    // 如果到了月底，且還沒到週五，先補滿空欄位直到週五前方
                     if (dayOfWeek !== 5 && d === daysInMonth) {
                         for (let b = dayOfWeek; b < 5; b++) {
                             html += '<td class="empty-cell"></td>';
