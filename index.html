@@ -19,21 +19,21 @@
             --text-dark: #1c1c1e;
             --text-gray: #8e8e93;
             
-            /* 調整：日曆全部改回淺色模式配色 */
+            /* 日曆淺色模式配色 */
             --cal-bg: #f2f2f7;
             --cal-card: #ffffff;
             --cal-text: #1c1c1e;
-            --cal-red-bg: #ffeef0;    /* 淺紅底 */
-            --cal-red-text: #d9383a;  /* 深紅字 */
-            --cal-green-bg: #e6f4ea;  /* 淺綠底 */
-            --cal-green-text: #28a745;/* 深綠字 */
+            --cal-red-bg: #ffeef0;    
+            --cal-red-text: #d9383a;  
+            --cal-green-bg: #e6f4ea;  
+            --cal-green-text: #28a745;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--ios-bg);
             color: var(--text-dark);
             margin: 0;
-            padding: 65px 20px 20px 20px;
+            padding: 20px;
         }
         
         /* 頂部切換鈕 */
@@ -48,13 +48,14 @@
             flex: 1;
             border: none;
             background: transparent;
-            padding: 8px 0;
-            font-size: 14px;
+            padding: 10px 0;
+            font-size: 15px;
             font-weight: 600;
             color: var(--text-dark);
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
         }
         .tab-btn.active {
             background: #ffffff;
@@ -120,7 +121,7 @@
         }
         
         .tw-shares { width: 72px; flex-shrink: 0; }
-        .us-shares { width: 48px; flex-shrink: 0; }
+        .us-shares { width: 58px; flex-shrink: 0; }
         .sub-yest { flex-grow: 1; }
         .stock-right { text-align: right; }
         
@@ -132,7 +133,7 @@
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* ==================== 報酬日曆專用樣式 (改為原本淺色調) ==================== */
+        /* ==================== 報酬日曆專用樣式 ==================== */
         .cal-header-selector {
             display: flex;
             justify-content: space-between;
@@ -177,7 +178,7 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.02);
         }
         .calendar-table td.has-data-cell {
-            cursor: pointer; /* 讓有資料的格子滑鼠移上去變手指手指 */
+            cursor: pointer; 
         }
         .cal-day-num {
             font-size: 11px;
@@ -187,7 +188,7 @@
             margin-bottom: 2px;
         }
         .cal-day-profit {
-            font-size: 14px; /* 💡 放大：從 11px 放大到 14px */
+            font-size: 14px; 
             font-weight: 700;
             text-align: center;
             display: block;
@@ -195,14 +196,13 @@
             overflow: hidden;
             margin-top: 6px;
         }
-        /* 淺色模式紅綠底配色方案 */
+        
         .cal-cell-up { background-color: var(--cal-red-bg) !important; }
         .cal-cell-up .cal-day-profit { color: var(--cal-red-text); }
         
         .cal-cell-down { background-color: var(--cal-green-bg) !important; }
         .cal-cell-down .cal-day-profit { color: var(--cal-green-text); }
         
-        /* 週損益特殊欄位 */
         .cal-week-total-cell {
             background-color: #e5e5ea !important;
         }
@@ -324,7 +324,7 @@
 
     <div id="details-modal" class="modal-overlay" onclick="closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
-            <div id="modal-date-title" class="modal-title">06/25 損益明細</div>
+            <div id="modal-date-title" class="modal-title">損益明細</div>
             <div class="modal-row">
                 <span>台股損益</span>
                 <span id="modal-tw-val">—</span>
@@ -348,18 +348,17 @@
         let twStockData = []; 
         let usStockData = []; 
         let rawHistoryRows = []; 
-        let currentYear = new Date().getFullYear();
-        let currentMonth = new Date().getMonth() + 1; 
-        let usdToTwdRate = 31.47;
+        let currentYear = 2026; // 固定 2026 年配合資料時間
+        let currentMonth = 6;    // 固定 6 月配合資料時間
+        let usdToTwdRate = 31.89;
         let twRetryCount = 0; 
         let usRetryCount = 0;
         const MAX_RETRIES = 3;
 
-        // 全域暫存，用來提供彈出視窗讀取台美股細項
         let globalDailyDetailStorage = {};
 
         function parseCleanFloat(val) {
-            if (!val) return 0;
+            if (val === undefined || val === null) return 0;
             let s = val.toString().replace(/,/g, '').replace(/%/g, '').replace(/[^\d.-]/g, '').trim();
             let n = parseFloat(s);
             return isNaN(n) ? 0 : n;
@@ -398,17 +397,14 @@
             
             document.getElementById('modal-date-title').innerText = `${searchMonthStr}/${displayDayStr} 損益明細`;
             
-            // 填入台股
             const twBox = document.getElementById('modal-tw-val');
             twBox.innerText = (data.tw >= 0 ? '+' : '') + Math.round(data.tw).toLocaleString();
             twBox.className = data.tw >= 0 ? 'cal-text-up' : 'cal-text-down';
 
-            // 填入美股
             const usBox = document.getElementById('modal-us-val');
             usBox.innerText = (data.us >= 0 ? '+' : '') + Math.round(data.us).toLocaleString();
             usBox.className = data.us >= 0 ? 'cal-text-up' : 'cal-text-down';
 
-            // 填入總計
             const totalBox = document.getElementById('modal-total-val');
             totalBox.innerText = (data.total >= 0 ? '+' : '') + Math.round(data.total).toLocaleString();
             totalBox.className = data.total >= 0 ? 'cal-text-up' : 'cal-text-down';
@@ -439,4 +435,322 @@
                 const rows = rawData.split(/\r?\n/).map(row => row.split(','));
                 let tempTwData = []; let hasValidPrice = false;
 
-                for(let i
+                for(let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length < 3) continue; // 💡 寬鬆防呆：只要有基本的前三欄就放行，不卡死長度
+                    
+                    let rawCode = row[0] ? row[0].trim() : "";
+                    const name = row[1] ? row[1].trim() : "";
+                    const shares = parseInt(row[2]);
+                    if (rawCode === "" || name === "" || isNaN(shares) || rawCode.includes("總計") || rawCode === "股票代號") continue;
+
+                    let cleanCode = rawCode.includes(":") ? rawCode.split(":")[1] : rawCode;
+                    let currentPrice = parseCleanFloat(row[4]);
+                    if (currentPrice > 0) hasValidPrice = true;
+
+                    let tChange = row[5] ? row[5] : 0;
+                    let pChange = row[6] ? row[6] : 0;
+
+                    tempTwData.push({
+                        code: cleanCode, name: name, shares: shares,
+                        yestPrice: parseCleanFloat(row[3]), currentPrice: currentPrice,
+                        totalChange: tChange, changePercent: pChange
+                    });
+                }
+                twStockData = tempTwData;
+                renderTaiwan();
+            } catch (e) {
+                if (twRetryCount < MAX_RETRIES) { twRetryCount++; setTimeout(fetchTaiwanData, 3000); } 
+                else { document.getElementById('tw-list-container').innerHTML = `<div class="loading" style="color:red;">台股同步失敗</div>`; }
+            }
+        }
+
+        async function fetchUsData() {
+            try {
+                const usCsvUrl = baseUrlUs + "&t=" + new Date().getTime();
+                const response = await fetch(usCsvUrl, { cache: "no-store" });
+                if (!response.ok) throw new Error("Network error");
+                const rawData = await response.text();
+                const rows = rawData.split(/\r?\n/).map(row => row.split(','));
+                let tempUsData = [];
+
+                if (rows[1] && rows[1][6]) {
+                    let rate = parseCleanFloat(rows[1][6]);
+                    if (rate > 0) usdToTwdRate = rate;
+                }
+
+                for(let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length < 3) continue;
+                    let code = row[0] ? row[0].trim() : "";
+                    const shares = parseCleanFloat(row[1]);      
+                    const yestPrice = parseCleanFloat(row[2]);   
+                    const currentPrice = parseCleanFloat(row[3]);
+                    if (code === "" || isNaN(shares) || shares === 0 || code.includes("股票代號") || code.includes("總計")) continue;
+
+                    tempUsData.push({
+                        code: code, shares: shares, yestPrice: yestPrice, currentPrice: currentPrice,
+                        todayChangeUsd: parseCleanFloat(row[4]), changePercent: row[5] ? row[5] : 0
+                    });
+                }
+                usStockData = tempUsData;
+                renderUs();
+            } catch (e) {
+                if (usRetryCount < MAX_RETRIES) { usRetryCount++; setTimeout(fetchUsData, 3000); } 
+                else { document.getElementById('us-list-container').innerHTML = `<div class="loading" style="color:red;">美股同步失敗</div>`; }
+            }
+        }
+
+        async function fetchHistoryData() {
+            try {
+                const historyCsvUrl = baseUrlHistory + "&t=" + new Date().getTime();
+                const response = await fetch(historyCsvUrl, { cache: "no-store" });
+                if (!response.ok) throw new Error("Network error");
+                const rawData = await response.text();
+                
+                rawHistoryRows = rawData.split(/\r?\n/).map(row => row.split(','));
+                if (document.getElementById('panel-history').classList.contains('active')) {
+                    renderCalendarView();
+                }
+            } catch (e) {
+                document.getElementById('history-calendar-container').innerHTML = `<div class="loading" style="color:red;">歷史紀錄讀取失敗</div>`;
+            }
+        }
+
+        function renderTaiwan() {
+            let totalProfit = 0; let totalYestValue = 0; let html = '';
+            twStockData.forEach(stock => {
+                let cleanTotalChange = parseCleanFloat(stock.totalChange);
+                let cleanChangePercent = parseCleanFloat(stock.changePercent);
+
+                totalProfit += cleanTotalChange;
+                if (stock.yestPrice > 0) totalYestValue += (stock.yestPrice * stock.shares);
+                const cClass = cleanTotalChange >= 0 ? 'tw-up' : 'tw-down';
+                const sign = cleanTotalChange >= 0 ? '+' : '';
+                html += `
+                    <div class="stock-item">
+                        <div class="stock-row">
+                            <div>
+                                <div class="stock-name">${stock.name} <span style="font-size:13px; color:var(--text-gray); font-weight:400;">(${stock.code})</span></div>
+                                <div class="stock-sub-container">
+                                    <span class="tw-shares">${stock.shares.toLocaleString()} 股</span>
+                                    <span class="sub-yest">昨收 ${stock.yestPrice.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div class="stock-right">
+                                <div class="stock-name">${stock.currentPrice.toLocaleString()}</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}${Math.round(cleanTotalChange).toLocaleString()} (${sign}${cleanChangePercent.toFixed(2)}%)</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            const box = document.getElementById('tw-total-box');
+            box.innerText = (totalProfit >= 0 ? '+' : '') + Math.round(totalProfit).toLocaleString();
+            box.className = 'total-profit ' + (totalProfit >= 0 ? 'tw-up' : 'tw-down');
+            let pct = totalYestValue > 0 ? (totalProfit / totalYestValue) * 100 : 0;
+            const pBox = document.getElementById('tw-percent-box');
+            pBox.innerText = `${totalProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            pBox.className = `total-percent ${totalProfit >= 0 ? 'tw-up' : 'tw-down'}`;
+            document.getElementById('tw-list-container').innerHTML = html;
+        }
+
+        function renderUs() {
+            let totalUsdProfit = 0; let totalYestUsd = 0; let html = '';
+            usStockData.forEach(stock => {
+                let cleanChangePercent = parseCleanFloat(stock.changePercent);
+                totalUsdProfit += stock.todayChangeUsd;
+                if (stock.yestPrice > 0) totalYestUsd += (stock.yestPrice * stock.shares);
+                const cClass = stock.todayChangeUsd >= 0 ? 'us-up' : 'us-down';
+                const sign = stock.todayChangeUsd >= 0 ? '+' : '';
+                html += `
+                    <div class="stock-item">
+                        <div class="stock-row">
+                            <div>
+                                <div class="stock-name">${stock.code}</div>
+                                <div class="stock-sub-container">
+                                    <span class="us-shares">${stock.shares} 股</span>
+                                    <span class="sub-yest">昨收 $${stock.yestPrice.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div class="stock-right">
+                                <div class="stock-name">$${stock.currentPrice.toFixed(2)}</div>
+                                <div class="stock-sub ${cClass}" style="font-weight:600;">${sign}$${stock.todayChangeUsd.toFixed(2)} (${sign}${cleanChangePercent.toFixed(2)}%)</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            const box = document.getElementById('us-total-box');
+            box.innerText = (totalUsdProfit >= 0 ? '+$' : '-$') + Math.abs(totalUsdProfit).toFixed(2);
+            box.className = 'total-profit ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
+            let pct = totalYestUsd > 0 ? (totalUsdProfit / totalYestUsd) * 100 : 0;
+            const pBox = document.getElementById('us-percent-box');
+            pBox.innerText = `${totalUsdProfit >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            pBox.className = `total-percent ${totalUsdProfit >= 0 ? 'us-up' : 'us-down'}`;
+            
+            const totalTwdProfit = Math.round(totalUsdProfit * usdToTwdRate);
+            const twdBox = document.getElementById('us-twd-box');
+            twdBox.innerText = `${totalTwdProfit >= 0 ? '+' : ''}${totalTwdProfit.toLocaleString()} TWD`;
+            twdBox.className = 'total-sub-row ' + (totalUsdProfit >= 0 ? 'us-up' : 'us-down');
+            
+            document.getElementById('us-list-container').innerHTML = html;
+        }
+
+        function renderCalendarView() {
+            if (rawHistoryRows.length === 0) return;
+
+            const searchMonthStr = currentMonth < 10 ? "0" + currentMonth : "" + currentMonth;
+            document.getElementById('cal-current-month-display').innerText = `${currentYear}/${searchMonthStr} 報酬`;
+
+            globalDailyDetailStorage = {};
+            let monthlyTotalSum = 0; 
+
+            for (let i = 1; i < rawHistoryRows.length; i++) {
+                const row = rawHistoryRows[i];
+                if (!row || row.length < 3) continue;
+
+                let dateRaw = row[0] ? row[0].trim().replace(/'/g, "") : ""; 
+                let market = row[1] ? row[1].trim() : "";
+                let profit = parseCleanFloat(row[2]);
+
+                if (dateRaw === "" || market === "" || market === "當月總損益") continue;
+
+                if (dateRaw.substring(0, 2) === searchMonthStr) {
+                    let dayKey = parseInt(dateRaw.substring(3, 5)).toString(); 
+                    
+                    if (!globalDailyDetailStorage[dayKey]) {
+                        globalDailyDetailStorage[dayKey] = { tw: 0, us: 0, total: 0 };
+                    }
+                    
+                    if (market.includes("台股")) {
+                        globalDailyDetailStorage[dayKey].tw += profit;
+                    } else if (market.includes("美股")) {
+                        globalDailyDetailStorage[dayKey].us += profit;
+                    }
+                    
+                    globalDailyDetailStorage[dayKey].total += profit;
+                    monthlyTotalSum += profit;
+                }
+            }
+
+            const totalBox = document.getElementById('cal-total-box');
+            totalBox.innerText = (monthlyTotalSum >= 0 ? '+' : '') + Math.round(monthlyTotalSum).toLocaleString();
+            totalBox.className = 'total-profit ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
+            
+            const percentBox = document.getElementById('cal-percent-box');
+            percentBox.innerText = monthlyTotalSum >= 0 ? "獲利" : "虧損";
+            percentBox.className = 'total-percent ' + (monthlyTotalSum >= 0 ? 'cal-text-up' : 'cal-text-down');
+
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+            
+            let html = `
+                <table class="calendar-table">
+                    <thead>
+                        <tr>
+                            <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th>
+                            <th style="color:#007aff;">週損益</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            let currentWeekProfit = 0; 
+            let hasWeekData = false;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dateObj = new Date(currentYear, currentMonth - 1, d);
+                let dayOfWeek = dateObj.getDay(); 
+
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    if (d === daysInMonth && hasWeekData) {
+                        html += `<td class="cal-week-total-cell">
+                                    <span class="cal-day-num" style="color:#007aff;">TOTAL</span>
+                                    <span class="cal-day-profit ${currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down'}">
+                                        ${currentWeekProfit >= 0 ? '+' : ''}${Math.round(currentWeekProfit).toLocaleString()}
+                                    </span>
+                                 </td></tr>`;
+                    }
+                    continue; 
+                }
+
+                if (dayOfWeek === 1 || html.endsWith('</tr>') || d === 1) {
+                    if (!html.endsWith('<tr>') && d === 1) {
+                        html += '<tr>';
+                        let blanks = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                        for (let b = 0; b < blanks; b++) {
+                            html += '<td class="empty-cell"></td>';
+                        }
+                    } else if (d !== 1) {
+                        html += '<tr>';
+                    }
+                    currentWeekProfit = 0;
+                    hasWeekData = false;
+                }
+
+                let dayStr = d.toString();
+                let hasData = globalDailyDetailStorage[dayStr] !== undefined;
+                let dayProfit = hasData ? globalDailyDetailStorage[dayStr].total : 0;
+                
+                let cellClass = '';
+                let displayProfit = '';
+                let onClickAttribute = '';
+                
+                if (hasData) {
+                    currentWeekProfit += dayProfit;
+                    hasWeekData = true;
+                    cellClass = dayProfit >= 0 ? 'cal-cell-up has-data-cell' : 'cal-cell-down has-data-cell';
+                    onClickAttribute = `onclick="showDayDetails(${d})"`;
+                    
+                    if (Math.abs(dayProfit) >= 10000) {
+                        displayProfit = (dayProfit / 10000).toFixed(1) + '萬';
+                    } else {
+                        displayProfit = Math.round(dayProfit).toLocaleString();
+                    }
+                    displayProfit = (dayProfit >= 0 ? '+' : '') + displayProfit;
+                }
+
+                html += `
+                    <td class="${cellClass}" ${onClickAttribute}>
+                        <span class="cal-day-num">${d}</span>
+                        <span class="cal-day-profit">${displayProfit}</span>
+                    </td>`;
+
+                if (dayOfWeek === 5 || d === daysInMonth) {
+                    if (dayOfWeek !== 5 && d === daysInMonth) {
+                        for (let b = dayOfWeek; b < 5; b++) {
+                            html += '<td class="empty-cell"></td>';
+                        }
+                    }
+                    
+                    let weekTotalStr = '—';
+                    let weekClass = '';
+                    if (hasWeekData) {
+                        weekTotalStr = (currentWeekProfit >= 0 ? '+' : '') + (currentWeekProfit / 10000).toFixed(1) + '萬';
+                        weekClass = currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down';
+                    }
+                    
+                    html += `
+                        <td class="cal-week-total-cell">
+                            <span class="cal-day-num" style="color:#007aff;">WEEK</span>
+                            <span class="cal-day-profit ${weekClass}">${weekTotalStr}</span>
+                        </td>
+                    </tr>`;
+                }
+            }
+
+            html += `</tbody></table>`;
+            document.getElementById('history-calendar-container').innerHTML = html;
+        }
+
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "visible") {
+                loadAllData();
+            }
+        });
+
+        loadAllData();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
