@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>每日證券損益</title>
     
+    <!-- iOS PWA 核心設定 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link class="apple-touch-icon" href="icon-192.png">
@@ -278,12 +279,14 @@
 </head>
 <body>
 
+    <!-- 頂部切換選單 -->
     <div class="tab-container">
         <button class="tab-btn active" onclick="switchTab('tw')">台股</button>
         <button class="tab-btn" onclick="switchTab('us')">美股</button>
         <button class="tab-btn" onclick="switchTab('history')">報酬日曆</button>
     </div>
 
+    <!-- ==================== 台股分頁面 ==================== -->
     <div id="panel-tw" class="tab-panel active">
         <div class="card">
             <div style="color: var(--text-gray); font-size: 14px; font-weight: 500;">今日預估總損益 (TWD)</div>
@@ -297,6 +300,7 @@
         </div>
     </div>
 
+    <!-- ==================== 美股分頁面 ==================== -->
     <div id="panel-us" class="tab-panel">
         <div class="card">
             <div style="color: var(--text-gray); font-size: 14px; font-weight: 500;">今日預估總損益</div>
@@ -311,6 +315,7 @@
         </div>
     </div>
 
+    <!-- ==================== 歷史紀錄（報酬日曆）分頁面 ==================== -->
     <div id="panel-history" class="tab-panel">
         <div class="card">
             <div id="cal-summary-title" style="color: var(--text-gray); font-size: 14px; font-weight: 500;">當月累積總報酬</div>
@@ -331,6 +336,7 @@
         </div>
     </div>
 
+    <!-- 浮動提示視窗 HTML 結構 -->
     <div id="details-modal" class="modal-overlay" onclick="closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
             <div id="modal-date-title" class="modal-title">損益明細</div>
@@ -357,8 +363,12 @@
         let twStockData = []; 
         let usStockData = []; 
         let rawHistoryRows = []; 
-        let currentYear = 2026; 
-        let currentMonth = 6;    
+        
+        // 💡 動態抓取當前系統時間的年份與月份
+        const now = new Date();
+        let currentYear = now.getFullYear(); 
+        let currentMonth = now.getMonth() + 1; 
+
         let usdToTwdRate = 31.89;
         let twRetryCount = 0; 
         let usRetryCount = 0;
@@ -702,7 +712,6 @@
                     cellClass = dayProfit >= 0 ? 'cal-cell-up has-data-cell' : 'cal-cell-down has-data-cell';
                     onClickAttribute = `onclick="showDayDetails(${d})"`;
                     
-                    // 💡 去掉「萬」字，僅留純數字格式
                     displayProfit = (dayProfit / 10000).toFixed(1);
                     displayProfit = (dayProfit >= 0 ? '+' : '') + displayProfit;
                 }
@@ -723,7 +732,6 @@
                     let weekTotalStr = '—';
                     let weekClass = '';
                     if (hasWeekData) {
-                        // 💡 週報酬同樣去掉「萬」字
                         weekTotalStr = (currentWeekProfit >= 0 ? '+' : '') + (currentWeekProfit / 10000).toFixed(1);
                         weekClass = currentWeekProfit >= 0 ? 'cal-text-up' : 'cal-text-down';
                     }
